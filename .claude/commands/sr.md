@@ -1,0 +1,1 @@
+Alias for /sprint-report. Run the `/sprint-report` skill with the same arguments: $ARGUMENTS

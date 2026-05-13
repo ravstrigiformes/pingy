@@ -1,0 +1,1 @@
+Alias for /worktree-cleanup. Run the `/worktree-cleanup` skill with the same arguments: $ARGUMENTS

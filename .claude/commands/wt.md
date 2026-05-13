@@ -1,0 +1,1 @@
+Alias for /worktree. Run the `/worktree` skill with the same arguments: $ARGUMENTS

@@ -1,0 +1,108 @@
+# --- OS / IDE -----------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+*.user
+*.suo
+
+# --- .NET ---------------------------------------------------------------
+bin/
+obj/
+*.userosscache
+*.sln.docstates
+*.cachefile
+*.VC.db
+*.VC.opendb
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]uild/
+[Bb]uilds/
+artifacts/
+.vs/
+*.psess
+*.vsp
+*.vspx
+*.sap
+launchSettings.json
+*.pfx
+*.snk
+
+# --- WiX / installer artifacts -----------------------------------------
+*.wixobj
+*.wixpdb
+*.msi
+*.exe.config
+
+# --- PHP / Laravel ------------------------------------------------------
+/server/vendor/
+/server/node_modules/
+/server/public/build/
+/server/public/hot/
+/server/public/storage
+/server/storage/*.key
+/server/storage/pail/
+/server/storage/app/private/
+/server/storage/app/public/
+/server/storage/framework/cache/
+/server/storage/framework/sessions/
+/server/storage/framework/testing/
+/server/storage/framework/views/
+/server/storage/logs/
+/server/.env
+/server/.env.backup
+/server/.env.production
+/server/.phpunit.result.cache
+/server/.phpunit.cache/
+/server/Homestead.json
+/server/Homestead.yaml
+/server/auth.json
+/server/.fleet
+/server/.zed
+/server/_ide_helper.php
+/server/_ide_helper_models.php
+/server/.phpstorm.meta.php
+
+# --- Node / frontend assets --------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Secrets & local config (NEVER COMMIT) ------------------------------
+*.keytab
+*.key
+*.pem
+*.crt
+.env.local
+.env.*.local
+secrets/
+infra/keytabs/*
+!infra/keytabs/.gitkeep
+
+# --- Build outputs ------------------------------------------------------
+publish/
+*.log
+*.tlog
+dist/
+
+# --- Test / coverage ----------------------------------------------------
+TestResults/
+coverage/
+*.cobertura.xml
+*.lcov
+.phpunit.cache/
+
+# --- Docker / volumes ---------------------------------------------------
+infra/docker/data/
+infra/docker/.volumes/
+
+# --- Project-local ------------------------------------------------------
+/tmp/
+/scratch/
