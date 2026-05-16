@@ -1,10 +1,14 @@
+using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using Pingy.Widget.ViewModels;
 
@@ -27,6 +31,19 @@ public partial class MainWindowV2 : Window
         {
             if (app.ViewModel is not null)
                 await app.ViewModel.StartAsync();
+            StartScanlineAnimation();
+            UpdateMaxRestoreGlyph();
+        };
+
+        SizeChanged += (_, _) => RebuildChromeGeometry();
+        StateChanged += (_, _) =>
+        {
+            // In mini mode, accidentally maximizing (Win+Up, double-click title) produces a
+            // tall thin column (width clamped to MiniMaxWidth, height = full work area).
+            // Bounce back to Normal so the user has to use the explicit snap-right button.
+            if (Vm is not null && Vm.IsMiniMode && WindowState == WindowState.Maximized)
+                WindowState = WindowState.Normal;
+            UpdateMaxRestoreGlyph();
         };
     }
 
@@ -35,7 +52,13 @@ public partial class MainWindowV2 : Window
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton == MouseButton.Left && e.ClickCount == 1)
-            DragMove();
+        {
+            // Aero snap (Win+arrow / drag-to-edge) needs WindowChrome's own move tracking.
+            // DragMove() works but lets us pause animations during the drag.
+            if (Vm is not null) Vm.IsInteracting = true;
+            try { DragMove(); }
+            finally { if (Vm is not null) Vm.IsInteracting = false; }
+        }
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>
@@ -79,6 +102,24 @@ public partial class MainWindowV2 : Window
         }
     }
 
+    private void ZoomIn_Click(object sender, RoutedEventArgs e)
+    {
+        if (Vm is null) return;
+        Vm.Zoom = Math.Min(MainViewModel.MaxZoom, Math.Round(Vm.Zoom + 0.1, 2));
+    }
+
+    private void ZoomOut_Click(object sender, RoutedEventArgs e)
+    {
+        if (Vm is null) return;
+        Vm.Zoom = Math.Max(MainViewModel.MinZoom, Math.Round(Vm.Zoom - 0.1, 2));
+    }
+
+    private void ZoomReset_Click(object sender, RoutedEventArgs e)
+    {
+        if (Vm is null) return;
+        Vm.Zoom = 1.0;
+    }
+
     // -- Add / Edit target ----------------------------------------------
 
     private async void AddTargetButton_Click(object sender, RoutedEventArgs e)
@@ -96,7 +137,6 @@ public partial class MainWindowV2 : Window
         if (sender is not FrameworkElement fe) return;
         if (fe.DataContext is not TargetStatusViewModel row) return;
 
-        // Bail if the click originated on the drag handle or any interactive child
         if (e.OriginalSource is DependencyObject src && (HasDragHandleAncestor(src) || IsClickInteractive(src))) return;
 
         var dlg = new AddTargetWindow(row.Target) { Owner = this };
@@ -142,7 +182,6 @@ public partial class MainWindowV2 : Window
         _dragGhost = CreateDragGhost(vm);
         _dragGhost.IsOpen = true;
 
-        // Override system DnD cursor with Hand for the duration of the drag
         GiveFeedbackEventHandler feedback = OnDragGiveFeedback;
         DragDrop.AddGiveFeedbackHandler(fe, feedback);
 
@@ -169,7 +208,6 @@ public partial class MainWindowV2 : Window
     private Popup CreateDragGhost(TargetStatusViewModel vm)
     {
         var cyanBrush = (Brush)Resources["CyanBrush"];
-        var voidBrush = (Brush)Resources["BgVoidBrush"];
         var brightBrush = (Brush)Resources["TextBrightBrush"];
 
         var stack = new StackPanel { Orientation = Orientation.Horizontal };
@@ -209,13 +247,6 @@ public partial class MainWindowV2 : Window
             BorderThickness = new Thickness(1),
             Padding = new Thickness(10, 5, 10, 5),
             Opacity = 0.85,
-            Effect = new DropShadowEffect
-            {
-                Color = Color.FromRgb(0x00, 0xF0, 0xFF),
-                BlurRadius = 14,
-                ShadowDepth = 0,
-                Opacity = 0.85,
-            },
             Child = stack,
         };
 
@@ -239,15 +270,14 @@ public partial class MainWindowV2 : Window
         e.Effects = DragDropEffects.Move;
         e.Handled = true;
 
-        // Place insertion indicator above/below this row based on cursor Y
         if (sender is FrameworkElement fe && fe.DataContext is TargetStatusViewModel target)
         {
+            // Column flow: insert before if cursor is on the left half of the card, otherwise after.
             var pos = e.GetPosition(fe);
-            var above = pos.Y < fe.ActualHeight / 2;
-            Vm.SetDropIndicator(target, above ? TargetStatusViewModel.DropPos.Above : TargetStatusViewModel.DropPos.Below);
+            var before = pos.X < fe.ActualWidth / 2;
+            Vm.SetDropIndicator(target, before ? TargetStatusViewModel.DropPos.Before : TargetStatusViewModel.DropPos.After);
         }
 
-        // Move ghost popup near cursor
         if (_dragGhost is not null)
         {
             var p = e.GetPosition(this);
@@ -271,10 +301,9 @@ public partial class MainWindowV2 : Window
         if (fromIdx < 0 || targetIdx < 0) { e.Handled = true; return; }
 
         var pos = e.GetPosition(fe);
-        var insertAbove = pos.Y < fe.ActualHeight / 2;
-        var toIdx = insertAbove ? targetIdx : targetIdx + 1;
+        var insertBefore = pos.X < fe.ActualWidth / 2;
+        var toIdx = insertBefore ? targetIdx : targetIdx + 1;
 
-        // Adjust for the source's own removal shifting indices
         if (fromIdx < toIdx) toIdx--;
         if (toIdx < 0) toIdx = 0;
         if (toIdx >= Vm.Targets.Count) toIdx = Vm.Targets.Count - 1;
@@ -285,27 +314,26 @@ public partial class MainWindowV2 : Window
 
     // -- Mini cycler -----------------------------------------------------
 
-    private void MiniCycler_Click(object sender, RoutedEventArgs e)
-    {
-        Vm?.CycleMiniDisplay();
-    }
+    private void MiniCycler_Click(object sender, RoutedEventArgs e) => Vm?.CycleMiniDisplay();
 
     // -- Mini-mode toggle -----------------------------------------------
 
-    private double _savedFullWidth = 640;
-    private double _savedFullHeight = 500;
+    private double _savedFullWidth = 900;
+    private double _savedFullHeight = 560;
 
-    private const double FullMinWidth = 520;
-    private const double FullMinHeight = 380;
-    private const double FullMaxWidth = 1600;
-    private const double FullMaxHeight = 1150;
+    private const double FullMinWidth = 360;
+    private const double FullMinHeight = 280;
 
+    // Mini-mode design size matches the Viewbox content (160x200). The Viewbox upscales
+    // anything larger, which used to make fonts/circles look oversized; restore the
+    // 1:1 default so mini looks the same as the original v1 mini overlay.
     private const double MiniWidth = 160;
     private const double MiniHeight = 200;
     private const double MiniMinWidth = 140;
-    private const double MiniMinHeight = 180;
+    private const double MiniMinHeight = 160;
+    // Width is capped so aero-snap keeps the mini footprint. Height is intentionally
+    // unconstrained so the snap-right button can fill the full work-area height.
     private const double MiniMaxWidth = 320;
-    private const double MiniMaxHeight = 400;
 
     private void ModeToggle_Click(object sender, RoutedEventArgs e)
     {
@@ -316,16 +344,19 @@ public partial class MainWindowV2 : Window
     private void GoToMini()
     {
         if (Vm is null) return;
+        // If currently maximized, drop back to Normal first so size assignments stick.
+        if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+
         _savedFullWidth = ActualWidth;
         _savedFullHeight = ActualHeight;
         MinWidth = 0; MinHeight = 0;
         MaxWidth = double.PositiveInfinity; MaxHeight = double.PositiveInfinity;
         Width = MiniWidth; Height = MiniHeight;
         MinWidth = MiniMinWidth; MinHeight = MiniMinHeight;
-        MaxWidth = MiniMaxWidth; MaxHeight = MiniMaxHeight;
+        // MaxWidth caps mini-mode aero-snap width so Windows keeps the mini footprint.
+        // MaxHeight stays unconstrained so the snap-right button can fill the work area.
+        MaxWidth = MiniMaxWidth; MaxHeight = double.PositiveInfinity;
         Vm.IsMiniMode = true;
-        ModeToggleBtn.Content = "▣";
-        ModeToggleBtn.ToolTip = "Restore";
     }
 
     private void GoToFull()
@@ -335,9 +366,220 @@ public partial class MainWindowV2 : Window
         MaxWidth = double.PositiveInfinity; MaxHeight = double.PositiveInfinity;
         Width = _savedFullWidth; Height = _savedFullHeight;
         MinWidth = FullMinWidth; MinHeight = FullMinHeight;
-        MaxWidth = FullMaxWidth; MaxHeight = FullMaxHeight;
         Vm.IsMiniMode = false;
-        ModeToggleBtn.Content = "▢";
-        ModeToggleBtn.ToolTip = "Mini mode";
+
+        // Anchor the restored window's right edge to the monitor's right edge so a snap-right
+        // mini doesn't restore partially off-screen. Vertically: keep the current Top but
+        // clamp to the work area so the window stays fully visible.
+        var wa = SystemParameters.WorkArea;
+        Left = wa.Right - _savedFullWidth;
+        if (Left < wa.Left) Left = wa.Left;
+        if (Top + _savedFullHeight > wa.Bottom) Top = Math.Max(wa.Top, wa.Bottom - _savedFullHeight);
+        if (Top < wa.Top) Top = wa.Top;
+
+        UpdateMaxRestoreGlyph();
+    }
+
+    // -- Maximize / Restore (full mode only) -----------------------------
+
+    private void MaxRestoreButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+        UpdateMaxRestoreGlyph();
+    }
+
+    private void UpdateMaxRestoreGlyph()
+    {
+        if (MaxRestoreBtn is null) return;
+        if (WindowState == WindowState.Maximized)
+        {
+            MaxRestoreBtn.Content = "❐";
+            MaxRestoreBtn.ToolTip = "Restore";
+        }
+        else
+        {
+            MaxRestoreBtn.Content = "▢";
+            MaxRestoreBtn.ToolTip = "Maximize";
+        }
+    }
+
+    // -- Mini-mode: snap to right edge (full screen height, mini width) --
+
+    private void MiniSnapRight_Click(object sender, RoutedEventArgs e)
+    {
+        if (Vm is null || !Vm.IsMiniMode) return;
+
+        // WPF silently no-ops Width/Height/Left/Top assignments when WindowState != Normal.
+        // Drop to Normal first so the new bounds actually apply.
+        if (WindowState != WindowState.Normal) WindowState = WindowState.Normal;
+
+        var wa = SystemParameters.WorkArea;
+        var w = Math.Min(Math.Max(ActualWidth, MiniMinWidth), MiniMaxWidth);
+
+        Width = w;
+        Height = wa.Height;
+        Left = wa.Right - w;
+        Top = wa.Top;
+
+        Vm.StatusLine = $"~ Snapped right: {w:F0} x {wa.Height:F0} at ({Left:F0}, {Top:F0})";
+    }
+
+    // -- Chrome geometry (cyber corner-cut border, redrawn on resize) ---
+
+    private const double CornerCut = 12.0;
+
+    private void RebuildChromeGeometry()
+    {
+        var w = ActualWidth;
+        var h = ActualHeight;
+        if (w < 20 || h < 20) return;
+        if (OuterChrome is null || InnerChrome is null) return;
+
+        // Outer (magenta shadow ring): full bounds with corner cuts at top-left and bottom-right.
+        OuterChrome.Data = BuildCornerCutGeometry(0, 0, w, h, CornerCut);
+        // Inner (cyan): inset by 2px for a double-stroke look.
+        InnerChrome.Data = BuildCornerCutGeometry(2, 2, w - 4, h - 4, CornerCut - 2);
+
+        // Resize scanline to the inner width as well.
+        if (Scanline is not null) Scanline.Width = w - 6;
+    }
+
+    private static Geometry BuildCornerCutGeometry(double x, double y, double w, double h, double cut)
+    {
+        if (cut < 0) cut = 0;
+        // Top-left + bottom-right corner cuts (angled bevels).
+        var pf = new PathFigure
+        {
+            StartPoint = new Point(x + cut, y),
+            IsClosed = true,
+            IsFilled = true,
+        };
+        pf.Segments.Add(new LineSegment(new Point(x + w, y), true));
+        pf.Segments.Add(new LineSegment(new Point(x + w, y + h - cut), true));
+        pf.Segments.Add(new LineSegment(new Point(x + w - cut, y + h), true));
+        pf.Segments.Add(new LineSegment(new Point(x, y + h), true));
+        pf.Segments.Add(new LineSegment(new Point(x, y + cut), true));
+
+        var pg = new PathGeometry();
+        pg.Figures.Add(pf);
+        pg.Freeze();
+        return pg;
+    }
+
+    // -- Scanline animation (started in code so we can pause cleanly) ----
+
+    private Storyboard? _scanlineStoryboard;
+
+    private void StartScanlineAnimation()
+    {
+        if (ScanlineXf is null) return;
+        var anim = new DoubleAnimation
+        {
+            From = -4,
+            To = Math.Max(200, ActualHeight),
+            Duration = new Duration(TimeSpan.FromSeconds(3.5)),
+            RepeatBehavior = RepeatBehavior.Forever,
+        };
+        // Re-target each tick (cheap), so the scanline grows with the window.
+        SizeChanged += (_, _) =>
+        {
+            if (_scanlineStoryboard is null) return;
+            anim.To = Math.Max(200, ActualHeight);
+        };
+        Storyboard.SetTarget(anim, ScanlineXf);
+        Storyboard.SetTargetProperty(anim, new PropertyPath("Y"));
+        _scanlineStoryboard = new Storyboard();
+        _scanlineStoryboard.Children.Add(anim);
+        _scanlineStoryboard.Begin();
+    }
+
+    // -- Win32 hook: pause anims during interactive move/resize ----------
+
+    private const int WM_ENTERSIZEMOVE = 0x0231;
+    private const int WM_EXITSIZEMOVE = 0x0232;
+    private const int WM_NCLBUTTONDOWN = 0x00A1;
+    private const int WM_GETMINMAXINFO = 0x0024;
+    private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+
+    private void Window_SourceInitialized(object? sender, EventArgs e)
+    {
+        var src = (HwndSource)PresentationSource.FromVisual(this);
+        src?.AddHook(WndProc);
+        RebuildChromeGeometry();
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        switch (msg)
+        {
+            case WM_ENTERSIZEMOVE:
+                if (Vm is not null) Vm.IsInteracting = true;
+                break;
+            case WM_EXITSIZEMOVE:
+                if (Vm is not null) Vm.IsInteracting = false;
+                break;
+            case WM_GETMINMAXINFO:
+                // WindowStyle=None + AllowsTransparency=True maximizes past the work-area edges by
+                // the resize-border thickness. Clamp the max size + position to the current monitor's
+                // work area so cards aren't clipped and column math gets the real visible width.
+                ClampMinMaxInfo(hwnd, lParam);
+                break;
+        }
+        return IntPtr.Zero;
+    }
+
+    private static void ClampMinMaxInfo(IntPtr hwnd, IntPtr lParam)
+    {
+        var monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        if (monitor == IntPtr.Zero) return;
+
+        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        if (!GetMonitorInfo(monitor, ref info)) return;
+
+        var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+        var work = info.rcWork;
+        var mon = info.rcMonitor;
+
+        mmi.ptMaxPosition.x = work.left - mon.left;
+        mmi.ptMaxPosition.y = work.top - mon.top;
+        mmi.ptMaxSize.x = work.right - work.left;
+        mmi.ptMaxSize.y = work.bottom - work.top;
+        mmi.ptMaxTrackSize.x = work.right - work.left;
+        mmi.ptMaxTrackSize.y = work.bottom - work.top;
+
+        Marshal.StructureToPtr(mmi, lParam, true);
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int left, top, right, bottom; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int x, y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MINMAXINFO
+    {
+        public POINT ptReserved;
+        public POINT ptMaxSize;
+        public POINT ptMaxPosition;
+        public POINT ptMinTrackSize;
+        public POINT ptMaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public int dwFlags;
     }
 }

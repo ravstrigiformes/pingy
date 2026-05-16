@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -12,24 +13,39 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     public const int HistoryCapacity = 90;
     public const int FullDotsCount = 60;
     public const int MiniDotsCount = 30;
-    private const double FailedRtt = 250.0;
+    private const double FailedRtt = 600.0;
     private const double ChartWidth = 120.0;
     private const double ChartHeight = 28.0;
-    private const double MaxRttMs = 200.0;
+    private const double MaxRttMs = 600.0;
 
-    // Cyber-friendly health palette for sample dots
-    private static readonly Brush ExcellentBrush = MakeBrush(0x22, 0xC5, 0x5E); // green
-    private static readonly Brush GoodBrush      = MakeBrush(0x84, 0xCC, 0x16); // lime
-    private static readonly Brush OkBrush        = MakeBrush(0xFF, 0xE6, 0x00); // yellow
-    private static readonly Brush PoorBrush      = MakeBrush(0xFF, 0xA5, 0x00); // orange
-    private static readonly Brush FailedBrush    = MakeBrush(0xFF, 0x2E, 0x63); // magenta-red
+    // Number of timeouts tolerated within the displayed window before they
+    // influence the worst-of-window color. <= this many timeouts are treated
+    // as transient blips and skipped when computing the row's accent.
+    private const int RtoGraceCount = 2;
 
-    // Cyberpunk palette for primary status (header indicator, badge, etc.)
+    // Latency tiers — sorted ascending severity (LAN best, FAIL worst).
+    public enum Tier { Lan = 0, Good = 1, Fair = 2, Poor = 3, Bad = 4, Fail = 5, Unknown = -1 }
+
+    private static readonly Brush LanBrush = MakeBrush(0x00, 0xF0, 0xFF); // cyan
+    private static readonly Brush GoodBrush = MakeBrush(0x22, 0xC5, 0x5E); // green
+    private static readonly Brush FairBrush = MakeBrush(0xFF, 0xE6, 0x00); // yellow
+    private static readonly Brush PoorBrush = MakeBrush(0xFF, 0x8C, 0x00); // orange
+    private static readonly Brush BadBrush = MakeBrush(0xFF, 0x2E, 0x63); // red/magenta
+    private static readonly Brush FailBrush = MakeBrush(0xFF, 0x2E, 0x63); // same as bad
     private static readonly Brush UnknownBrush = MakeBrush(0xFF, 0xE6, 0x00); // yellow init
-    private static readonly Brush UpBrush      = MakeBrush(0x00, 0xF0, 0xFF); // cyan
-    private static readonly Brush DownBrush    = MakeBrush(0xFF, 0x2E, 0x63); // magenta
 
-    private readonly Queue<(double rtt, bool ok, Brush dotBrush)> _samples = new(HistoryCapacity);
+    private static Brush BrushFor(Tier t) => t switch
+    {
+        Tier.Lan => LanBrush,
+        Tier.Good => GoodBrush,
+        Tier.Fair => FairBrush,
+        Tier.Poor => PoorBrush,
+        Tier.Bad => BadBrush,
+        Tier.Fail => FailBrush,
+        _ => UnknownBrush,
+    };
+
+    private readonly Queue<Sample> _samples = new(HistoryCapacity);
 
     [ObservableProperty] private Target _target;
     public string Host => Target.Host;
@@ -48,7 +64,10 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     [ObservableProperty] private string _state = "INIT";
     [ObservableProperty] private string _stateBadge = "—";
     [ObservableProperty] private string _rttDisplay = "—— MS";
+    // Live status (UP/DOWN/INIT) — cyan/magenta/yellow. Used for the small status badge text only.
     [ObservableProperty] private Brush _stateBrush = UnknownBrush;
+    // Row accent: worst-tier brush computed from the displayed sample window (with RTO grace).
+    [ObservableProperty] private Brush _accentBrush = UnknownBrush;
     [ObservableProperty] private System.DateTimeOffset _lastUpdate = System.DateTimeOffset.MinValue;
     [ObservableProperty] private PointCollection _latencyPolyline = new();
 
@@ -61,14 +80,17 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     public ObservableCollection<Brush> RecentDots { get; } = new();        // last FullDotsCount samples
     public ObservableCollection<Brush> RecentDotsMini { get; } = new();    // last MiniDotsCount samples
 
-    public enum DropPos { None, Above, Below }
+    // Drop position is column-flow oriented: Before = visually to the left of this card
+    // (or wrap-to-end-of-previous-row), After = visually to the right. Renamed from Above/Below
+    // when the layout switched from single-column rows to multi-column WrapPanel.
+    public enum DropPos { None, Before, After }
     [ObservableProperty] private DropPos _dropIndicator = DropPos.None;
-    public bool IsDropAbove => DropIndicator == DropPos.Above;
-    public bool IsDropBelow => DropIndicator == DropPos.Below;
+    public bool IsDropBefore => DropIndicator == DropPos.Before;
+    public bool IsDropAfter => DropIndicator == DropPos.After;
     partial void OnDropIndicatorChanged(DropPos value)
     {
-        OnPropertyChanged(nameof(IsDropAbove));
-        OnPropertyChanged(nameof(IsDropBelow));
+        OnPropertyChanged(nameof(IsDropBefore));
+        OnPropertyChanged(nameof(IsDropAfter));
     }
 
     public TargetStatusViewModel(Target target) => _target = target;
@@ -78,30 +100,41 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         State = result.Status.ToUpperInvariant();
         StateBadge = result.Success ? "UP" : "DOWN";
         RttDisplay = result.Success ? $"{result.RttMs:F0} MS" : "—— MS";
-        StateBrush = result.Success ? UpBrush : DownBrush;
+        StateBrush = result.Success
+            ? MakeBrush(0x00, 0xF0, 0xFF)   // live cyan for UP
+            : MakeBrush(0xFF, 0x2E, 0x63);  // live magenta for DOWN
         LastUpdate = result.At;
         LastRttMs = result.RttMs;
         LastWasSuccess = result.Success;
         OnPropertyChanged(nameof(RttSortKey));
         OnPropertyChanged(nameof(StatusSortKey));
 
-        // Always track samples; the XAML decides between polyline / dot-strip via ShowGraph
         var rtt = result.Success ? (result.RttMs ?? 0) : FailedRtt;
-        var dotBrush = ComputeDotBrush(result);
-        _samples.Enqueue((rtt, result.Success, dotBrush));
+        var tier = ComputeTier(result);
+        _samples.Enqueue(new Sample(rtt, result.Success, tier));
         while (_samples.Count > HistoryCapacity) _samples.Dequeue();
+
         LatencyPolyline = BuildPolyline();
         RebuildRecentDots();
+        RecomputeAccent();
     }
 
-    private static Brush ComputeDotBrush(PingResult r)
+    // Tier thresholds (round-trip ms):
+    //   < 10  -> LAN (intranet-grade)
+    //   < 100 -> GOOD (healthy internet)
+    //   < 250 -> FAIR (usable but noticeable)
+    //   < 500 -> POOR (degraded)
+    //   >=500 -> BAD
+    //   timeout -> FAIL
+    private static Tier ComputeTier(PingResult r)
     {
-        if (!r.Success) return FailedBrush;
+        if (!r.Success) return Tier.Fail;
         var rtt = r.RttMs ?? 0;
-        if (rtt < 50) return ExcellentBrush;
-        if (rtt < 150) return GoodBrush;
-        if (rtt < 300) return OkBrush;
-        return PoorBrush;
+        if (rtt < 10) return Tier.Lan;
+        if (rtt < 100) return Tier.Good;
+        if (rtt < 250) return Tier.Fair;
+        if (rtt < 500) return Tier.Poor;
+        return Tier.Bad;
     }
 
     private void RebuildRecentDots()
@@ -111,12 +144,44 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         RebuildSlice(RecentDotsMini, arr, MiniDotsCount);
     }
 
-    private static void RebuildSlice(ObservableCollection<Brush> dest, (double rtt, bool ok, Brush dotBrush)[] arr, int count)
+    private static void RebuildSlice(ObservableCollection<Brush> dest, Sample[] arr, int count)
     {
         dest.Clear();
         var start = System.Math.Max(0, arr.Length - count);
         for (int i = start; i < arr.Length; i++)
-            dest.Add(arr[i].dotBrush);
+            dest.Add(BrushFor(arr[i].Tier));
+    }
+
+    // Accent = worst tier observed in the displayed window (FullDotsCount most-recent samples),
+    // with one quirk: up to RtoGraceCount timeouts are treated as transient blips and ignored.
+    // If more than RtoGraceCount timeouts occur in the window, FAIL wins outright.
+    private void RecomputeAccent()
+    {
+        if (_samples.Count == 0)
+        {
+            AccentBrush = UnknownBrush;
+            return;
+        }
+
+        var arr = _samples.ToArray();
+        var start = System.Math.Max(0, arr.Length - FullDotsCount);
+        int failCount = 0;
+        Tier worstNonFail = Tier.Lan;
+        bool sawAny = false;
+        for (int i = start; i < arr.Length; i++)
+        {
+            var s = arr[i];
+            if (s.Tier == Tier.Fail) { failCount++; continue; }
+            sawAny = true;
+            if (s.Tier > worstNonFail) worstNonFail = s.Tier;
+        }
+
+        Tier accent;
+        if (failCount > RtoGraceCount) accent = Tier.Fail;
+        else if (!sawAny) accent = Tier.Fail; // window is entirely timeouts but <= grace? still all-fail
+        else accent = worstNonFail;
+
+        AccentBrush = BrushFor(accent);
     }
 
     private PointCollection BuildPolyline()
@@ -128,7 +193,7 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         for (int i = 0; i < arr.Length; i++)
         {
             var x = arr.Length == 1 ? ChartWidth : (double)i / (arr.Length - 1) * ChartWidth;
-            var clamped = System.Math.Min(System.Math.Max(arr[i].rtt, 0), MaxRttMs);
+            var clamped = System.Math.Min(System.Math.Max(arr[i].Rtt, 0), MaxRttMs);
             var y = ChartHeight - (clamped / MaxRttMs) * ChartHeight;
             pts.Add(new Point(x, y));
         }
@@ -141,4 +206,6 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         brush.Freeze();
         return brush;
     }
+
+    private readonly record struct Sample(double Rtt, bool Ok, Tier Tier);
 }

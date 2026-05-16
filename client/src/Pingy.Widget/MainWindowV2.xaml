@@ -3,11 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Pingy.Widget.ViewModels"
         xmlns:cv="clr-namespace:Pingy.Widget.Converters"
+        xmlns:ctl="clr-namespace:Pingy.Widget.Controls"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         Title="PINGY // V2"
-        Width="640" Height="500"
-        MinWidth="520" MinHeight="380"
-        MaxWidth="1600" MaxHeight="1150"
+        Width="900" Height="560"
+        MinWidth="360" MinHeight="280"
         Topmost="{Binding IsTopmost}"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
@@ -17,7 +17,8 @@
         Opacity="{Binding Value, ElementName=OpacitySlider, Mode=OneWay}"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True"
-        SnapsToDevicePixels="True">
+        SnapsToDevicePixels="True"
+        SourceInitialized="Window_SourceInitialized">
 
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0"
@@ -62,7 +63,7 @@
             <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
             <Setter Property="Effect">
                 <Setter.Value>
-                    <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
+                    <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="6" ShadowDepth="0" Opacity="0.85"/>
                 </Setter.Value>
             </Setter>
         </Style>
@@ -134,18 +135,13 @@
                                 BorderThickness="{TemplateBinding BorderThickness}">
                             <Grid>
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <!-- active dot -->
                                 <Ellipse x:Name="ActiveDot"
                                          Width="3" Height="3"
                                          HorizontalAlignment="Right"
                                          VerticalAlignment="Top"
                                          Margin="0,2,2,0"
                                          Visibility="Collapsed"
-                                         Fill="{StaticResource CyanBrush}">
-                                    <Ellipse.Effect>
-                                        <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="4" ShadowDepth="0"/>
-                                    </Ellipse.Effect>
-                                </Ellipse>
+                                         Fill="{StaticResource CyanBrush}"/>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -157,11 +153,6 @@
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
                                 <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
                                 <Setter TargetName="ActiveDot" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="Bd" Property="Effect">
-                                    <Setter.Value>
-                                        <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="6" ShadowDepth="0" Opacity="0.7"/>
-                                    </Setter.Value>
-                                </Setter>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -198,11 +189,7 @@
                                     <RepeatButton Command="Slider.DecreaseLarge">
                                         <RepeatButton.Template>
                                             <ControlTemplate TargetType="RepeatButton">
-                                                <Rectangle Height="2" Fill="{StaticResource CyanBrush}">
-                                                    <Rectangle.Effect>
-                                                        <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>
-                                                    </Rectangle.Effect>
-                                                </Rectangle>
+                                                <Rectangle Height="2" Fill="{StaticResource CyanBrush}"/>
                                             </ControlTemplate>
                                         </RepeatButton.Template>
                                     </RepeatButton>
@@ -223,11 +210,7 @@
                                                 <Polygon Points="0,0 10,0 5,10"
                                                          Fill="{StaticResource CyanBrush}"
                                                          Width="10" Height="10"
-                                                         Margin="0,2,0,0">
-                                                    <Polygon.Effect>
-                                                        <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="8" ShadowDepth="0" Opacity="1"/>
-                                                    </Polygon.Effect>
-                                                </Polygon>
+                                                         Margin="0,2,0,0"/>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -247,7 +230,6 @@
             <Setter Property="Margin" Value="0,2,4,0"/>
         </Style>
 
-        <!-- Filter chip toggle -->
         <Style x:Key="FilterChip" TargetType="ToggleButton">
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
             <Setter Property="FontSize" Value="9"/>
@@ -276,7 +258,6 @@
             </Setter>
         </Style>
 
-        <!-- Custom-templated cyber ComboBox (avoids WPF's perennial styling bugs) -->
         <Style x:Key="CyberComboItem" TargetType="ComboBoxItem">
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
             <Setter Property="FontSize" Value="10"/>
@@ -377,9 +358,6 @@
                                         BorderBrush="{StaticResource CyanBrush}"
                                         BorderThickness="1"
                                         MinWidth="{TemplateBinding ActualWidth}">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="14" ShadowDepth="0" Opacity="0.7"/>
-                                    </Border.Effect>
                                     <ScrollViewer Margin="2" MaxHeight="240">
                                         <StackPanel IsItemsHost="True"/>
                                     </ScrollViewer>
@@ -391,18 +369,18 @@
             </Setter>
         </Style>
 
-        <!-- Hover overlay for clickable target row. Padding="0" so the handle column reaches edge-to-edge; content padding lives on inner StackPanel. -->
-        <Style x:Key="TargetRowBorder" TargetType="Border">
-            <Setter Property="BorderBrush" Value="#1A00F0FF"/>
-            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <!-- Compact target-card container for the responsive grid (gaps come from the panel). -->
+        <Style x:Key="TargetCardBorder" TargetType="Border">
+            <Setter Property="BorderBrush" Value="#3300F0FF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="#080B16"/>
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="Margin" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="Transparent"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#0A00F0FF"/>
-                    <Setter Property="BorderBrush" Value="#5500F0FF"/>
+                    <Setter Property="Background" Value="#10101D2A"/>
+                    <Setter Property="BorderBrush" Value="#7700F0FF"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -411,83 +389,77 @@
     <Grid>
 
     <!-- ================ FULL MODE ================ -->
-    <Viewbox Stretch="Uniform" StretchDirection="Both"
-             Visibility="{Binding IsFullMode, Converter={StaticResource BoolToVis}}">
-        <Grid x:Name="DesignRoot" Width="640" Height="500">
+    <Grid Visibility="{Binding IsFullMode, Converter={StaticResource BoolToVis}}">
 
-            <Path Stroke="{StaticResource MagentaBrush}" StrokeThickness="1" StrokeLineJoin="Miter" SnapsToDevicePixels="True"
-                  Data="M 14,0 L 640,0 L 640,486 L 626,500 L 0,500 L 0,14 Z">
-                <Path.Effect><DropShadowEffect Color="{StaticResource Magenta}" BlurRadius="20" ShadowDepth="0" Opacity="0.55"/></Path.Effect>
-            </Path>
+        <!-- Chrome layer: outer magenta shadow, inner cyan border, both sized to the window via SizeChanged. -->
+        <Path x:Name="OuterChrome"
+              Stroke="{StaticResource MagentaBrush}"
+              StrokeThickness="1"
+              StrokeLineJoin="Miter"
+              SnapsToDevicePixels="True">
+            <Path.Effect><DropShadowEffect Color="{StaticResource Magenta}" BlurRadius="14" ShadowDepth="0" Opacity="0.45"/></Path.Effect>
+        </Path>
 
-            <Path Stroke="{StaticResource CyanBrush}" StrokeThickness="1" SnapsToDevicePixels="True"
-                  Data="M 16,2 L 638,2 L 638,485 L 625,498 L 2,498 L 2,16 Z">
-                <Path.Fill><SolidColorBrush Color="{StaticResource BgVoid}"/></Path.Fill>
-                <Path.Effect><DropShadowEffect x:Name="BorderGlow" Color="{StaticResource Cyan}" BlurRadius="14" ShadowDepth="0" Opacity="0.85"/></Path.Effect>
-                <Path.Triggers>
-                    <EventTrigger RoutedEvent="Loaded">
-                        <BeginStoryboard>
-                            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                <DoubleAnimation Storyboard.TargetName="BorderGlow" Storyboard.TargetProperty="BlurRadius" From="10" To="22" Duration="0:0:1.6"/>
-                                <DoubleAnimation Storyboard.TargetName="BorderGlow" Storyboard.TargetProperty="Opacity" From="0.55" To="0.95" Duration="0:0:1.6"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </EventTrigger>
-                </Path.Triggers>
-            </Path>
+        <Path x:Name="InnerChrome"
+              Stroke="{StaticResource CyanBrush}"
+              StrokeThickness="1"
+              SnapsToDevicePixels="True">
+            <Path.Fill><SolidColorBrush Color="{StaticResource BgVoid}"/></Path.Fill>
+            <Path.Effect>
+                <DropShadowEffect x:Name="BorderGlow"
+                                  Color="{StaticResource Cyan}"
+                                  BlurRadius="8"
+                                  ShadowDepth="0"
+                                  Opacity="0.55"/>
+            </Path.Effect>
+        </Path>
 
-            <!-- background grid -->
-            <Canvas IsHitTestVisible="False" ClipToBounds="True" Margin="3,17,3,3">
-                <Canvas.OpacityMask>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#FF000000" Offset="0"/>
-                        <GradientStop Color="#33000000" Offset="1"/>
-                    </RadialGradientBrush>
-                </Canvas.OpacityMask>
-                <Canvas.Background>
-                    <DrawingBrush TileMode="Tile" Viewport="0,0,24,24" ViewportUnits="Absolute">
-                        <DrawingBrush.Drawing>
-                            <GeometryDrawing>
-                                <GeometryDrawing.Pen><Pen Brush="#1500F0FF" Thickness="1"/></GeometryDrawing.Pen>
-                                <GeometryDrawing.Geometry>
-                                    <GeometryGroup>
-                                        <LineGeometry StartPoint="0,0" EndPoint="24,0"/>
-                                        <LineGeometry StartPoint="0,0" EndPoint="0,24"/>
-                                    </GeometryGroup>
-                                </GeometryDrawing.Geometry>
-                            </GeometryDrawing>
-                        </DrawingBrush.Drawing>
-                    </DrawingBrush>
-                </Canvas.Background>
-            </Canvas>
+        <!-- background grid -->
+        <Canvas IsHitTestVisible="False" ClipToBounds="True" Margin="3,3,3,3">
+            <Canvas.OpacityMask>
+                <RadialGradientBrush>
+                    <GradientStop Color="#FF000000" Offset="0"/>
+                    <GradientStop Color="#33000000" Offset="1"/>
+                </RadialGradientBrush>
+            </Canvas.OpacityMask>
+            <Canvas.Background>
+                <DrawingBrush TileMode="Tile" Viewport="0,0,24,24" ViewportUnits="Absolute">
+                    <DrawingBrush.Drawing>
+                        <GeometryDrawing>
+                            <GeometryDrawing.Pen><Pen Brush="#1500F0FF" Thickness="1"/></GeometryDrawing.Pen>
+                            <GeometryDrawing.Geometry>
+                                <GeometryGroup>
+                                    <LineGeometry StartPoint="0,0" EndPoint="24,0"/>
+                                    <LineGeometry StartPoint="0,0" EndPoint="0,24"/>
+                                </GeometryGroup>
+                            </GeometryDrawing.Geometry>
+                        </GeometryDrawing>
+                    </DrawingBrush.Drawing>
+                </DrawingBrush>
+            </Canvas.Background>
+        </Canvas>
 
-            <!-- scanline (only when animations on) -->
-            <Canvas IsHitTestVisible="False" ClipToBounds="True" Margin="3,17,3,3"
-                    Visibility="{Binding AnimationsEnabled, Converter={StaticResource BoolToVis}}">
-                <Rectangle x:Name="Scanline" Width="634" Height="2" Opacity="0.55">
-                    <Rectangle.Fill>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                            <GradientStop Color="#0000F0FF" Offset="0"/>
-                            <GradientStop Color="#FF00F0FF" Offset="0.5"/>
-                            <GradientStop Color="#0000F0FF" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Rectangle.Fill>
-                    <Rectangle.Effect><BlurEffect Radius="2"/></Rectangle.Effect>
-                    <Rectangle.RenderTransform><TranslateTransform x:Name="ScanlineXf" Y="-4"/></Rectangle.RenderTransform>
-                    <Rectangle.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetName="ScanlineXf" Storyboard.TargetProperty="Y" From="-4" To="480" Duration="0:0:3.5"/>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Rectangle.Triggers>
-                </Rectangle>
-            </Canvas>
+        <!-- Scanline (animations + not interacting). Paused during window drag/resize. -->
+        <Canvas x:Name="ScanlineCanvas" IsHitTestVisible="False" ClipToBounds="True" Margin="3,3,3,3"
+                Visibility="{Binding ScanlineActive, Converter={StaticResource BoolToVis}}">
+            <Rectangle x:Name="Scanline" Height="2" Opacity="0.45">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#0000F0FF" Offset="0"/>
+                        <GradientStop Color="#FF00F0FF" Offset="0.5"/>
+                        <GradientStop Color="#0000F0FF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+                <Rectangle.RenderTransform><TranslateTransform x:Name="ScanlineXf" Y="-4"/></Rectangle.RenderTransform>
+            </Rectangle>
+        </Canvas>
 
-            <!-- CONTENT -->
-            <Grid Margin="14,16,14,12">
+        <!-- CONTENT (scaled by Zoom via LayoutTransform on inner grid) -->
+        <Grid Margin="14,12,14,10">
+            <Grid.LayoutTransform>
+                <ScaleTransform ScaleX="{Binding Zoom}" ScaleY="{Binding Zoom}"/>
+            </Grid.LayoutTransform>
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -504,36 +476,19 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Orientation="Vertical">
-                        <StackPanel Orientation="Horizontal">
-                            <!-- Health indicator (was REC dot) -->
-                            <Ellipse Width="9" Height="9"
-                                     Fill="{Binding HealthBrush}"
-                                     VerticalAlignment="Center" Margin="0,0,8,0"
-                                     ToolTip="{Binding HealthLabel}">
-                                <Ellipse.Effect>
-                                    <DropShadowEffect Color="#FF00F0FF" BlurRadius="10" ShadowDepth="0" Opacity="1"/>
-                                </Ellipse.Effect>
-                                <Ellipse.Triggers>
-                                    <EventTrigger RoutedEvent="Loaded">
-                                        <BeginStoryboard>
-                                            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.45" Duration="0:0:1.2"/>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </EventTrigger>
-                                </Ellipse.Triggers>
-                            </Ellipse>
-                            <TextBlock Text="PINGY" FontSize="20" FontWeight="Bold" Style="{StaticResource GlowText}"/>
-                            <TextBlock Text="//" FontSize="20" Margin="6,0,6,0" Foreground="{StaticResource TextDimBrush}" FontWeight="Bold"/>
-                            <TextBlock Text="NETWORK MONITOR" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextBrightBrush}"/>
-                            <TextBlock Text=".v2" FontSize="11" Foreground="{StaticResource MagentaBrush}" VerticalAlignment="Top" Margin="2,2,0,0"/>
-                            <TextBlock Text=" :: " FontSize="11" Foreground="{StaticResource TextDimBrush}" VerticalAlignment="Center" Margin="6,4,0,0"/>
-                            <TextBlock Text="{Binding HealthLabel}" FontSize="11" Foreground="{Binding HealthBrush}" VerticalAlignment="Center" Margin="0,4,0,0" FontWeight="Bold"/>
-                        </StackPanel>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <Ellipse Width="9" Height="9"
+                                 Fill="{Binding HealthBrush}"
+                                 VerticalAlignment="Center" Margin="0,0,8,0"
+                                 ToolTip="{Binding HealthLabel}"/>
+                        <TextBlock Text="PINGY" FontSize="18" FontWeight="Bold" Style="{StaticResource GlowText}"/>
+                        <TextBlock Text="//" FontSize="18" Margin="6,0,6,0" Foreground="{StaticResource TextDimBrush}" FontWeight="Bold"/>
+                        <TextBlock Text="NETWORK MONITOR" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextBrightBrush}"/>
+                        <TextBlock Text=".v2" FontSize="10" Foreground="{StaticResource MagentaBrush}" VerticalAlignment="Top" Margin="2,2,0,0"/>
+                        <TextBlock Text=" :: " FontSize="11" Foreground="{StaticResource TextDimBrush}" VerticalAlignment="Center" Margin="6,4,0,0"/>
+                        <TextBlock Text="{Binding HealthLabel}" FontSize="11" Foreground="{Binding HealthBrush}" VerticalAlignment="Center" Margin="0,4,0,0" FontWeight="Bold"/>
                     </StackPanel>
 
-                    <!-- Window-control cluster: GRAPH | PIN | MIN | MINI | CLOSE -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                         <ToggleButton Style="{StaticResource IconToggle}"
                                       IsChecked="{Binding AnimationsEnabled, Mode=TwoWay}"
@@ -545,18 +500,22 @@
                                       ToolTip="Always on top">
                             <TextBlock Text="⌖" FontSize="14"/>
                         </ToggleButton>
+                        <!-- Dedicated mini-mode toggle (separate from maximize) -->
+                        <Button Style="{StaticResource ChromeButton}" Content="▭" Click="ModeToggle_Click" ToolTip="Collapse to mini" FontSize="12"/>
+                        <!-- Standard Windows cluster: minimize | maximize-restore | close -->
                         <Button Style="{StaticResource ChromeButton}" Content="—" Click="MinimizeButton_Click" ToolTip="Minimize"/>
-                        <Button x:Name="ModeToggleBtn" Style="{StaticResource ChromeButton}" Content="▢" Click="ModeToggle_Click" ToolTip="Mini mode"/>
+                        <Button x:Name="MaxRestoreBtn" Style="{StaticResource ChromeButton}" Content="▢" Click="MaxRestoreButton_Click" ToolTip="Maximize"/>
                         <Button Style="{StaticResource CloseButton}" Content="✕" Click="CloseButton_Click" Margin="0" ToolTip="Close"/>
                     </StackPanel>
                 </Grid>
 
                 <!-- ROW 1: PRIMARY TOOLBAR -->
-                <Grid Grid.Row="1" Margin="0,12,0,0">
+                <Grid Grid.Row="1" Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
@@ -573,9 +532,25 @@
                         <TextBlock Style="{StaticResource LabelText}" Text="s [1–300]" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="3" Orientation="Vertical" VerticalAlignment="Center" Margin="0,0,4,0">
+                    <!-- Zoom stepper -->
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <TextBlock Style="{StaticResource LabelText}" Text="ZOOM " VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ChromeButton}" Content="−" Click="ZoomOut_Click" MinWidth="22" ToolTip="Zoom out"/>
+                        <TextBlock Text="{Binding Zoom, StringFormat={}{0:P0}}"
+                                   FontFamily="Cascadia Mono, Consolas"
+                                   FontSize="10"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource CyanBrush}"
+                                   MinWidth="40"
+                                   TextAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ChromeButton}" Content="+" Click="ZoomIn_Click" MinWidth="22" ToolTip="Zoom in"/>
+                        <Button Style="{StaticResource ChromeButton}" Content="⌂" Click="ZoomReset_Click" MinWidth="22" Margin="2,0,0,0" ToolTip="Reset zoom to 100%"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4" Orientation="Vertical" VerticalAlignment="Center" Margin="0,0,4,0">
                         <TextBlock Style="{StaticResource LabelText}" Text="OPACITY" HorizontalAlignment="Center"/>
-                        <Slider x:Name="OpacitySlider" Style="{StaticResource CyberSlider}" Minimum="0.3" Maximum="1.0" Value="0.95" Width="120" Height="14"/>
+                        <Slider x:Name="OpacitySlider" Style="{StaticResource CyberSlider}" Minimum="0.3" Maximum="1.0" Value="0.95" Width="110" Height="14"/>
                     </StackPanel>
                 </Grid>
 
@@ -611,93 +586,132 @@
                 <!-- ROW 3: divider -->
                 <Border Grid.Row="3" Height="1" Margin="0,8,0,8" BorderThickness="0,0,0,1" BorderBrush="#3300F0FF"/>
 
-                <!-- ROW 4: TARGETS LIST -->
+                <!-- ROW 4: TARGETS LIST (responsive grid — fills width, cards stretch, min 280px per card) -->
                 <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding TargetsView}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <!-- WPF measures in device-independent (logical) pixels at 96 DPI.
+                                       A 1920x1080 display at 150% DPI is 1280x720 LOGICAL pixels.
+                                       MinItemWidth=220 → ~2-3 cols at half-screen, ~5-6 cols maximized
+                                       on a 150% DPI display, scales sensibly across other DPIs too. -->
+                                <ctl:ResponsiveWrapPanel MinItemWidth="220" HorizontalGap="8" VerticalGap="8"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:TargetStatusViewModel}">
-                                <StackPanel Orientation="Vertical">
-                                    <!-- Insertion indicator (above) -->
-                                    <Border Margin="2,0,2,0" Height="6"
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <!-- Drop indicators: vertical pipes on left/right edges (column-flow insert) -->
+                                    <Border HorizontalAlignment="Left" VerticalAlignment="Stretch" Width="3"
+                                            Margin="-5,0,0,0"
                                             Background="{StaticResource CyanBrush}"
-                                            CornerRadius="3"
-                                            Visibility="{Binding IsDropAbove, Converter={StaticResource BoolToVis}}">
-                                        <Border.Effect><DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="14" ShadowDepth="0" Opacity="1"/></Border.Effect>
-                                    </Border>
+                                            Visibility="{Binding IsDropBefore, Converter={StaticResource BoolToVis}}"/>
+                                    <Border HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="3"
+                                            Margin="0,0,-5,0"
+                                            Background="{StaticResource CyanBrush}"
+                                            Visibility="{Binding IsDropAfter, Converter={StaticResource BoolToVis}}"/>
 
-                                <Border Style="{StaticResource TargetRowBorder}"
-                                        MouseLeftButtonUp="TargetRow_MouseLeftButtonUp"
-                                        AllowDrop="True"
-                                        DragOver="Row_DragOver"
-                                        Drop="Row_Drop">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="28"/>   <!-- handle rail (full row height) -->
-                                            <ColumnDefinition Width="*"/>    <!-- content (info + viz) -->
-                                        </Grid.ColumnDefinitions>
-
-                                        <!-- Drag handle rail spanning the entire row height -->
-                                        <Border Grid.Column="0"
-                                                Cursor="Hand"
-                                                Tag="DragHandle"
-                                                AllowDrop="True"
-                                                PreviewMouseLeftButtonDown="DragHandle_PreviewMouseLeftButtonDown"
-                                                DragOver="Row_DragOver"
-                                                Drop="Row_Drop"
-                                                ToolTip="Drag to reorder"
-                                                Visibility="{Binding DataContext.CanReorder, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Background" Value="Transparent"/>
-                                                    <Setter Property="BorderBrush" Value="Transparent"/>
-                                                    <Setter Property="BorderThickness" Value="0,0,1,0"/>
-                                                    <Style.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter Property="Background" Value="#2A00F0FF"/>
-                                                            <Setter Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
-                                                        </Trigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <TextBlock Text="⋮⋮"
-                                                       FontSize="16"
-                                                       FontWeight="Bold"
-                                                       Foreground="{StaticResource TextBrightBrush}"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       IsHitTestVisible="False"/>
-                                        </Border>
-
-                                        <StackPanel Grid.Column="1" Orientation="Vertical" Margin="0,8,12,8">
-
-                                        <!-- INFO ROW -->
+                                    <Border Style="{StaticResource TargetCardBorder}"
+                                            MouseLeftButtonUp="TargetRow_MouseLeftButtonUp"
+                                            AllowDrop="True"
+                                            DragOver="Row_DragOver"
+                                            Drop="Row_Drop">
                                         <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="6"/>
-                                                <ColumnDefinition Width="20"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
 
-                                            <Rectangle Grid.Column="0" Width="3" Fill="{Binding StateBrush}" Margin="0,4">
-                                                <Rectangle.Effect><DropShadowEffect Color="#FF00F0FF" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/></Rectangle.Effect>
-                                            </Rectangle>
+                                            <!-- Top accent bar (uses AccentBrush — worst-in-window color) -->
+                                            <Rectangle Grid.Row="0" Height="2" Fill="{Binding AccentBrush}"/>
 
-                                            <Polygon Grid.Column="1" Points="6,0 12,6 6,12 0,6" Fill="{Binding StateBrush}" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="2,0,0,0">
-                                                <Polygon.Effect><DropShadowEffect Color="#FF00F0FF" BlurRadius="10" ShadowDepth="0" Opacity="1"/></Polygon.Effect>
-                                            </Polygon>
+                                            <!-- Header: drag handle | diamond | label/host | latency | badge -->
+                                            <Grid Grid.Row="1" Margin="8,6,8,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
 
-                                            <StackPanel Grid.Column="2" Orientation="Vertical" Margin="14,0,0,0">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="{Binding Label}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextBrightBrush}">
-                                                        <TextBlock.Effect><DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="6" ShadowDepth="0" Opacity="0.45"/></TextBlock.Effect>
-                                                    </TextBlock>
-                                                    <TextBlock Style="{StaticResource LabelText}" Text="  ::  " VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding Host}" FontSize="13" FontFamily="Cascadia Mono, Consolas" Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
+                                                <!-- Drag handle (small, visible only when reorder allowed) -->
+                                                <Border Grid.Column="0"
+                                                        Width="14" Height="20"
+                                                        Background="Transparent"
+                                                        Cursor="SizeAll"
+                                                        Tag="DragHandle"
+                                                        VerticalAlignment="Center"
+                                                        Margin="0,0,4,0"
+                                                        AllowDrop="True"
+                                                        PreviewMouseLeftButtonDown="DragHandle_PreviewMouseLeftButtonDown"
+                                                        DragOver="Row_DragOver"
+                                                        Drop="Row_Drop"
+                                                        ToolTip="Drag to reorder"
+                                                        Visibility="{Binding DataContext.CanReorder, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="⋮⋮"
+                                                               FontSize="13"
+                                                               FontWeight="Bold"
+                                                               Foreground="{StaticResource TextDimBrush}"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               IsHitTestVisible="False"/>
+                                                </Border>
+
+                                                <!-- Diamond — uses AccentBrush (worst-in-window) -->
+                                                <Polygon Grid.Column="1"
+                                                         Points="6,0 12,6 6,12 0,6"
+                                                         Fill="{Binding AccentBrush}"
+                                                         Width="12" Height="12"
+                                                         VerticalAlignment="Center"
+                                                         Margin="0,0,8,0"/>
+
+                                                <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Label}"
+                                                               FontSize="13" FontWeight="Bold"
+                                                               Foreground="{StaticResource TextBrightBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding Host}"
+                                                               FontSize="10"
+                                                               FontFamily="Cascadia Mono, Consolas"
+                                                               Foreground="{StaticResource CyanBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Opacity="0.85"/>
                                                 </StackPanel>
-                                                <ItemsControl ItemsSource="{Binding Tags}" Margin="0,2,0,0">
-                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+
+                                                <!-- Right side: latency + status badge stacked -->
+                                                <StackPanel Grid.Column="3" Orientation="Vertical" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding RttDisplay}"
+                                                               FontSize="15" FontWeight="Bold"
+                                                               HorizontalAlignment="Right"
+                                                               Foreground="{Binding AccentBrush}"/>
+                                                    <Border BorderBrush="{Binding StateBrush}"
+                                                            BorderThickness="1"
+                                                            Padding="5,0"
+                                                            HorizontalAlignment="Right"
+                                                            Margin="0,2,0,0">
+                                                        <TextBlock Text="{Binding StateBadge}"
+                                                                   FontSize="9"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{Binding StateBrush}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- Bottom: tags + sparkline / dot strip -->
+                                            <Grid Grid.Row="2" Margin="8,0,8,8">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+
+                                                <ItemsControl Grid.Row="0" ItemsSource="{Binding Tags}" Margin="0,0,0,4">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate DataType="{x:Type sys:String}">
                                                             <Border Style="{StaticResource TagPill}">
@@ -706,75 +720,48 @@
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
-                                            </StackPanel>
 
-                                            <StackPanel Grid.Column="3" Orientation="Vertical" VerticalAlignment="Center" Margin="14,0,18,0">
-                                                <TextBlock Style="{StaticResource LabelText}" Text="LATENCY" HorizontalAlignment="Right"/>
-                                                <TextBlock Text="{Binding RttDisplay}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Right" Foreground="{Binding StateBrush}">
-                                                    <TextBlock.Effect><DropShadowEffect Color="#FF00F0FF" BlurRadius="10" ShadowDepth="0" Opacity="0.7"/></TextBlock.Effect>
-                                                </TextBlock>
-                                            </StackPanel>
+                                                <!-- VIZ: polyline (animations ON) -->
+                                                <Grid Grid.Row="1" Height="28"
+                                                      Visibility="{Binding DataContext.AnimationsEnabled, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
+                                                    <Border BorderBrush="#1500F0FF" BorderThickness="1" Background="#080B16"/>
+                                                    <Line Stroke="#3300F0FF" StrokeThickness="0.5" StrokeDashArray="2,4" X1="0" X2="600" Y1="14" Y2="14" Stretch="Fill" HorizontalAlignment="Stretch"/>
+                                                    <Polyline Points="{Binding LatencyPolyline}" Stroke="{Binding AccentBrush}" StrokeThickness="1.5" Stretch="Fill" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                                </Grid>
 
-                                            <Border Grid.Column="4" BorderBrush="{Binding StateBrush}" BorderThickness="1" Padding="8,3" VerticalAlignment="Center" MinWidth="60">
-                                                <Border.Effect><DropShadowEffect Color="#FF00F0FF" BlurRadius="8" ShadowDepth="0" Opacity="0.6"/></Border.Effect>
-                                                <TextBlock Text="{Binding StateBadge}" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{Binding StateBrush}"/>
-                                            </Border>
+                                                <!-- VIZ: dot strip (animations OFF) -->
+                                                <ItemsControl Grid.Row="1"
+                                                              ItemsSource="{Binding RecentDots}"
+                                                              Height="10"
+                                                              HorizontalAlignment="Stretch"
+                                                              Visibility="{Binding DataContext.AnimationsEnabled, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InvBoolToVis}}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <UniformGrid Rows="1" Columns="60" HorizontalAlignment="Stretch"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Ellipse HorizontalAlignment="Stretch"
+                                                                     VerticalAlignment="Center"
+                                                                     Height="6"
+                                                                     Margin="0.5,0"
+                                                                     Fill="{Binding}"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Grid>
                                         </Grid>
-
-                                        <!-- VIZ: polyline (when ANIMATIONS ON) -->
-                                        <Grid Margin="0,6,12,0" Height="32"
-                                              Visibility="{Binding DataContext.AnimationsEnabled, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
-                                            <Border BorderBrush="#1500F0FF" BorderThickness="1" Background="#080B16"/>
-                                            <Line Stroke="#3300F0FF" StrokeThickness="0.5" StrokeDashArray="2,4" X1="0" X2="600" Y1="14" Y2="14" Stretch="Fill" HorizontalAlignment="Stretch"/>
-                                            <Polyline Points="{Binding LatencyPolyline}" Stroke="{Binding StateBrush}" StrokeThickness="1.5" Stretch="Fill" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                                <Polyline.Effect><DropShadowEffect Color="#FF00F0FF" BlurRadius="6" ShadowDepth="0" Opacity="0.85"/></Polyline.Effect>
-                                            </Polyline>
-                                        </Grid>
-
-                                        <!-- VIZ: dot strip (when ANIMATIONS OFF) — 60 samples, ellipses stretch to nearly fill each cell -->
-                                        <ItemsControl ItemsSource="{Binding RecentDots}"
-                                                      Margin="0,6,12,0"
-                                                      Height="12"
-                                                      HorizontalAlignment="Stretch"
-                                                      Visibility="{Binding DataContext.AnimationsEnabled, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InvBoolToVis}}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <UniformGrid Rows="1" Columns="60" HorizontalAlignment="Stretch"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Ellipse HorizontalAlignment="Stretch"
-                                                             VerticalAlignment="Center"
-                                                             Height="8"
-                                                             Margin="0.5,0"
-                                                             Fill="{Binding}">
-                                                        <Ellipse.Effect><DropShadowEffect Color="#FF00F0FF" BlurRadius="3" ShadowDepth="0" Opacity="0.55"/></Ellipse.Effect>
-                                                    </Ellipse>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-
-                                    <!-- Insertion indicator (below) -->
-                                    <Border Margin="2,0,2,0" Height="6"
-                                            Background="{StaticResource CyanBrush}"
-                                            CornerRadius="3"
-                                            Visibility="{Binding IsDropBelow, Converter={StaticResource BoolToVis}}">
-                                        <Border.Effect><DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="14" ShadowDepth="0" Opacity="1"/></Border.Effect>
                                     </Border>
-                                </StackPanel>
+                                </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
 
                 <!-- ROW 5: STATUS BAR -->
-                <Grid Grid.Row="5" Margin="0,8,0,0">
-                    <Border Background="#160B1326" BorderBrush="#3300F0FF" BorderThickness="1,1,1,0" Padding="10,6">
+                <Grid Grid.Row="5" Margin="0,6,0,0">
+                    <Border Background="#160B1326" BorderBrush="#3300F0FF" BorderThickness="1,1,1,0" Padding="10,5">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -794,16 +781,14 @@
                     </Border>
                 </Grid>
             </Grid>
-
         </Grid>
-    </Viewbox>
+    </Grid>
 
     <!-- ================ MINI MODE ================ -->
-    <Viewbox Stretch="Uniform" StretchDirection="Both"
-             Visibility="{Binding IsMiniMode, Converter={StaticResource BoolToVis}}">
-        <Grid Width="160" Height="200">
-            <Border BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" Background="{StaticResource BgVoidBrush}">
-                <Border.Effect><DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="10" ShadowDepth="0" Opacity="0.7"/></Border.Effect>
+    <!-- No Viewbox: content fills the window naturally so snap-right can stretch full height
+         without distorting/centering the design. Font sizes stay at their original "small mini" values. -->
+    <Grid Visibility="{Binding IsMiniMode, Converter={StaticResource BoolToVis}}">
+        <Border BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" Background="{StaticResource BgVoidBrush}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -817,11 +802,10 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
-                            <Ellipse Width="6" Height="6" Fill="{Binding HealthBrush}" Margin="0,0,4,0" ToolTip="{Binding HealthLabel}">
-                                <Ellipse.Effect><DropShadowEffect Color="#FF00F0FF" BlurRadius="6" ShadowDepth="0"/></Ellipse.Effect>
-                            </Ellipse>
+                            <Ellipse Width="6" Height="6" Fill="{Binding HealthBrush}" Margin="0,0,4,0" ToolTip="{Binding HealthLabel}"/>
                             <TextBlock Text="pingy" FontSize="10" FontWeight="Bold" Foreground="{StaticResource CyanBrush}"/>
                         </StackPanel>
                         <ToggleButton Grid.Column="1" Style="{StaticResource IconToggle}"
@@ -831,8 +815,10 @@
                             <TextBlock Text="∿" FontSize="11" FontWeight="Bold"/>
                         </ToggleButton>
                         <Button Grid.Column="2" Style="{StaticResource ChromeButton}" Content="↻" Click="MiniCycler_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="11" ToolTip="Cycle display field (host / label)"/>
-                        <Button Grid.Column="3" Style="{StaticResource ChromeButton}" Content="▣" Click="ModeToggle_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="10" ToolTip="Restore"/>
-                        <Button Grid.Column="4" Style="{StaticResource CloseButton}" Content="✕" Click="CloseButton_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="9"/>
+                        <!-- Snap to right edge, full height, keep mini width -->
+                        <Button Grid.Column="3" Style="{StaticResource ChromeButton}" Content="⇥" Click="MiniSnapRight_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="11" ToolTip="Snap to right edge (full height)"/>
+                        <Button Grid.Column="4" Style="{StaticResource ChromeButton}" Content="▣" Click="ModeToggle_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="10" ToolTip="Restore to full"/>
+                        <Button Grid.Column="5" Style="{StaticResource CloseButton}" Content="✕" Click="CloseButton_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="9"/>
                     </Grid>
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" Padding="0,2,0,0">
@@ -847,9 +833,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <Ellipse Grid.Column="0" Width="6" Height="6" Fill="{Binding StateBrush}" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                                <Ellipse.Effect><DropShadowEffect Color="#FF00F0FF" BlurRadius="5" ShadowDepth="0" Opacity="0.95"/></Ellipse.Effect>
-                                            </Ellipse>
+                                            <Ellipse Grid.Column="0" Width="6" Height="6" Fill="{Binding AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                             <TextBlock Grid.Column="1"
                                                        FontSize="10"
                                                        FontFamily="Cascadia Mono, Consolas"
@@ -871,9 +855,8 @@
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
-                                            <TextBlock Grid.Column="2" Text="{Binding RttDisplay}" FontSize="9" FontFamily="Cascadia Mono, Consolas" FontWeight="Bold" Foreground="{Binding StateBrush}" VerticalAlignment="Center" Margin="4,0,2,0"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding RttDisplay}" FontSize="9" FontFamily="Cascadia Mono, Consolas" FontWeight="Bold" Foreground="{Binding AccentBrush}" VerticalAlignment="Center" Margin="4,0,2,0"/>
                                         </Grid>
-                                        <!-- Mini dot strip — visible by default; toggle in mini title bar binds to ShowMiniDots -->
                                         <ItemsControl ItemsSource="{Binding RecentDotsMini}"
                                                       Height="6"
                                                       Margin="0,0,0,0"
@@ -902,8 +885,7 @@
                     </ScrollViewer>
                 </Grid>
             </Border>
-        </Grid>
-    </Viewbox>
+    </Grid>
 
     </Grid>
 </Window>

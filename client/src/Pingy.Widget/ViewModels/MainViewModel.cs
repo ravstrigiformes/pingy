@@ -37,6 +37,19 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private Brush _healthBrush = HealthYellowBrush;
     [ObservableProperty] private string _healthLabel = "INIT";
 
+    // Manual zoom factor applied via LayoutTransform on the content root.
+    // Decoupled from window size — resize and zoom are now independent.
+    public const double MinZoom = 0.6;
+    public const double MaxZoom = 2.0;
+    [ObservableProperty] private double _zoom = 1.0;
+
+    // True while the user is dragging or resizing the window. Bound to scanline +
+    // breathing-border opacity so we can pause expensive animations during move/resize.
+    [ObservableProperty] private bool _isInteracting;
+    public bool ScanlineActive => AnimationsEnabled && !IsInteracting;
+    partial void OnAnimationsEnabledChanged(bool value) => OnPropertyChanged(nameof(ScanlineActive));
+    partial void OnIsInteractingChanged(bool value) => OnPropertyChanged(nameof(ScanlineActive));
+
     public bool IsFullMode => !IsMiniMode;
     partial void OnIsMiniModeChanged(bool value) => OnPropertyChanged(nameof(IsFullMode));
 
@@ -90,7 +103,7 @@ public sealed partial class MainViewModel : ObservableObject
         FilterChips.CollectionChanged += (_, _) => RefreshFilterSubscriptions();
     }
 
-partial void OnIntervalSecondsChanged(int value)
+    partial void OnIntervalSecondsChanged(int value)
     {
         if (!_initialized) return;
         if (value < MinIntervalSeconds || value > MaxIntervalSeconds) return;
@@ -257,7 +270,7 @@ partial void OnIntervalSecondsChanged(int value)
 
     private void AddTargetVm(Target t)
     {
-        var vm = new TargetStatusViewModel(t) ;
+        var vm = new TargetStatusViewModel(t);
         vm.PropertyChanged += OnTargetPropertyChanged;
         Targets.Add(vm);
     }
