@@ -53,12 +53,51 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     public string Label => string.IsNullOrWhiteSpace(Target.Label) ? Target.Host : Target.Label!;
     public IReadOnlyList<string> Tags => Target.Tags ?? System.Array.Empty<string>();
 
+    public ObservableCollection<PortStatusViewModel> Ports { get; } = new();
+    public bool HasPorts => Ports.Count > 0;
+
     partial void OnTargetChanged(Target value)
     {
         OnPropertyChanged(nameof(Host));
         OnPropertyChanged(nameof(Kind));
         OnPropertyChanged(nameof(Label));
         OnPropertyChanged(nameof(Tags));
+        SyncPorts(value.Ports);
+    }
+
+    // Reconcile the Ports VM collection against the Target's port list. Same port-number
+    // VMs are preserved (so history isn't reset on a label edit); added/removed ports
+    // are added/removed in place.
+    private void SyncPorts(IReadOnlyList<TargetPort>? desired)
+    {
+        var want = desired ?? System.Array.Empty<TargetPort>();
+        var byNumber = Ports.ToDictionary(p => p.Number);
+
+        // Remove ports no longer wanted.
+        var keep = want.Select(p => p.Number).ToHashSet();
+        for (int i = Ports.Count - 1; i >= 0; i--)
+        {
+            if (!keep.Contains(Ports[i].Number)) Ports.RemoveAt(i);
+        }
+
+        // Add or refresh.
+        for (int i = 0; i < want.Count; i++)
+        {
+            if (byNumber.TryGetValue(want[i].Number, out var existing))
+            {
+                if (!Equals(existing.Port, want[i])) existing.Port = want[i];
+                // Move to correct index if order shifted.
+                var currentIdx = Ports.IndexOf(existing);
+                if (currentIdx != i && i < Ports.Count) Ports.Move(currentIdx, i);
+            }
+            else
+            {
+                Ports.Insert(System.Math.Min(i, Ports.Count), new PortStatusViewModel(want[i]));
+            }
+        }
+
+        OnPropertyChanged(nameof(HasPorts));
+        RecomputeAccent();
     }
 
     [ObservableProperty] private string _state = "INIT";
@@ -93,7 +132,19 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         OnPropertyChanged(nameof(IsDropAfter));
     }
 
-    public TargetStatusViewModel(Target target) => _target = target;
+    public TargetStatusViewModel(Target target)
+    {
+        _target = target;
+        SyncPorts(target.Ports);
+    }
+
+    public void UpdatePort(PortProbeResult result)
+    {
+        var vm = Ports.FirstOrDefault(p => p.Number == result.Port);
+        if (vm is null) return;
+        vm.Update(result);
+        RecomputeAccent();
+    }
 
     public void Update(PingResult result)
     {
@@ -180,6 +231,10 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         if (failCount > RtoGraceCount) accent = Tier.Fail;
         else if (!sawAny) accent = Tier.Fail; // window is entirely timeouts but <= grace? still all-fail
         else accent = worstNonFail;
+
+        // Any monitored port that has reported and is currently closed pushes the card to Fail
+        // — a closed port the user opted to watch is a real signal, not a footnote.
+        if (Ports.Any(p => p.HasResult && !p.LastWasOpen)) accent = Tier.Fail;
 
         AccentBrush = BrushFor(accent);
     }

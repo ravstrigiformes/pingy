@@ -22,6 +22,7 @@ public sealed partial class MainViewModel : ObservableObject
     private static readonly Brush HealthMagentaBrush = Frozen(0xFF, 0x2E, 0x63); // all down
 
     private readonly IPinger _pinger;
+    private readonly IPortProbe _portProbe;
     private readonly ITargetLoader _loader;
     private CancellationTokenSource? _cts;
     private TargetsConfig? _currentConfig;
@@ -89,9 +90,10 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private SortChoice _selectedSort;
 
-    public MainViewModel(IPinger pinger, ITargetLoader loader)
+    public MainViewModel(IPinger pinger, IPortProbe portProbe, ITargetLoader loader)
     {
         _pinger = pinger;
+        _portProbe = portProbe;
         _loader = loader;
         ConfigPath = loader.ConfigPath;
 
@@ -179,10 +181,11 @@ public sealed partial class MainViewModel : ObservableObject
         catch (System.Exception ex)
         {
             StatusLine = $"Failed to load config: {ex.Message}";
+            Pingy.Widget.CrashLogger.Log("startup.load", ex);
         }
     }
 
-    public async Task<bool> AddTargetAsync(string label, string host, IReadOnlyList<string> tags)
+    public async Task<bool> AddTargetAsync(string label, string host, IReadOnlyList<string> tags, IReadOnlyList<TargetPort>? ports = null)
     {
         if (string.IsNullOrWhiteSpace(host)) return false;
         if (_currentConfig is null) return false;
@@ -191,7 +194,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (Targets.Any(t => t.Target.Id == id))
             id = $"{id}-{System.Guid.NewGuid().ToString("N")[..4]}";
 
-        var newTarget = BuildTarget(id, label, host, tags);
+        var newTarget = BuildTarget(id, label, host, tags, ports);
         var updated = _currentConfig with { Targets = _currentConfig.Targets.Concat(new[] { newTarget }).ToArray() };
         await _loader.SaveAsync(updated);
         _currentConfig = updated;
@@ -203,13 +206,13 @@ public sealed partial class MainViewModel : ObservableObject
         return true;
     }
 
-    public async Task<bool> UpdateTargetAsync(string id, string label, string host, IReadOnlyList<string> tags)
+    public async Task<bool> UpdateTargetAsync(string id, string label, string host, IReadOnlyList<string> tags, IReadOnlyList<TargetPort>? ports = null)
     {
         if (_currentConfig is null) return false;
         var existingIdx = Targets.ToList().FindIndex(t => t.Target.Id == id);
         if (existingIdx < 0) return false;
 
-        var updatedTarget = BuildTarget(id, label, host, tags);
+        var updatedTarget = BuildTarget(id, label, host, tags, ports);
         var newList = _currentConfig.Targets.ToArray();
         var configIdx = System.Array.FindIndex(newList, t => t.Id == id);
         if (configIdx < 0) return false;
@@ -275,7 +278,7 @@ public sealed partial class MainViewModel : ObservableObject
         Targets.Add(vm);
     }
 
-    private static Target BuildTarget(string id, string label, string host, IReadOnlyList<string> tags)
+    private static Target BuildTarget(string id, string label, string host, IReadOnlyList<string> tags, IReadOnlyList<TargetPort>? ports)
     {
         var primaryKind = (tags?.FirstOrDefault() ?? "host").ToLowerInvariant();
         var cleanedTags = tags?.Where(t => !string.IsNullOrWhiteSpace(t))
@@ -284,12 +287,20 @@ public sealed partial class MainViewModel : ObservableObject
                               .ToArray()
                           ?? System.Array.Empty<string>();
 
+        // De-dupe ports by number, keep first label seen, drop out-of-range.
+        var cleanedPorts = ports?
+            .Where(p => p.Number is > 0 and <= 65535)
+            .GroupBy(p => p.Number)
+            .Select(g => new TargetPort(g.Key, g.Select(x => x.Label).FirstOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim()))
+            .ToArray();
+
         return new Target(
             Id: id,
             Host: host.Trim(),
             Kind: primaryKind,
             Label: string.IsNullOrWhiteSpace(label) ? host : label.Trim(),
-            Tags: cleanedTags);
+            Tags: cleanedTags,
+            Ports: cleanedPorts is { Length: > 0 } ? cleanedPorts : null);
     }
 
     private void OnTargetPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -421,16 +432,47 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task ProbeAllAsync(CancellationToken ct)
     {
         var snapshot = Targets.ToList();
-        var tasks = snapshot.Select(async tvm =>
+        var timeout = System.TimeSpan.FromMilliseconds(1500);
+        var tasks = new List<Task>();
+
+        foreach (var tvm in snapshot)
         {
-            try
-            {
-                var result = await _pinger.PingAsync(tvm.Target, System.TimeSpan.FromMilliseconds(1500), ct);
-                Application.Current?.Dispatcher.Invoke(() => tvm.Update(result));
-            }
-            catch (System.OperationCanceledException) { }
-        });
+            tasks.Add(ProbeIcmpAsync(tvm, timeout, ct));
+            foreach (var port in tvm.Target.Ports ?? System.Array.Empty<Pingy.Core.Models.TargetPort>())
+                tasks.Add(ProbePortAsync(tvm, port.Number, timeout, ct));
+        }
+
         await Task.WhenAll(tasks);
+    }
+
+    private async Task ProbeIcmpAsync(TargetStatusViewModel tvm, System.TimeSpan timeout, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _pinger.PingAsync(tvm.Target, timeout, ct);
+            Application.Current?.Dispatcher.Invoke(() => tvm.Update(result));
+        }
+        catch (System.OperationCanceledException) { }
+        catch (System.Exception ex)
+        {
+            // Survive a single bad probe/UI update — log & keep the loop running. Without this
+            // the exception aggregates through Task.WhenAll → unobserved task → silent process exit.
+            Pingy.Widget.CrashLogger.Log("probe.icmp", ex, $"target={tvm.Target.Id} host={tvm.Target.Host}");
+        }
+    }
+
+    private async Task ProbePortAsync(TargetStatusViewModel tvm, int port, System.TimeSpan timeout, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _portProbe.ProbeAsync(tvm.Target, port, timeout, ct);
+            Application.Current?.Dispatcher.Invoke(() => tvm.UpdatePort(result));
+        }
+        catch (System.OperationCanceledException) { }
+        catch (System.Exception ex)
+        {
+            Pingy.Widget.CrashLogger.Log("probe.port", ex, $"target={tvm.Target.Id} host={tvm.Target.Host} port={port}");
+        }
     }
 
     private static Brush Frozen(byte r, byte g, byte b)

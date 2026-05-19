@@ -5,4 +5,5 @@ public sealed record Target(
     string Host,
     string Kind,
     string? Label = null,
-    IReadOnlyList<string>? Tags = null);
+    IReadOnlyList<string>? Tags = null,
+    IReadOnlyList<TargetPort>? Ports = null);

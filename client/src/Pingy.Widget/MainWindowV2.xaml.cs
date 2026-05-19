@@ -128,7 +128,7 @@ public partial class MainWindowV2 : Window
         var dlg = new AddTargetWindow { Owner = this };
         var ok = dlg.ShowDialog();
         if (ok != true) return;
-        await Vm.AddTargetAsync(dlg.LabelText, dlg.HostText, dlg.CollectTags());
+        await Vm.AddTargetAsync(dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts());
     }
 
     private async void TargetRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -146,7 +146,7 @@ public partial class MainWindowV2 : Window
         if (dlg.DeleteRequested)
             await Vm.DeleteTargetAsync(row.Target.Id);
         else
-            await Vm.UpdateTargetAsync(row.Target.Id, dlg.LabelText, dlg.HostText, dlg.CollectTags());
+            await Vm.UpdateTargetAsync(row.Target.Id, dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts());
     }
 
     private static bool IsClickInteractive(DependencyObject src)

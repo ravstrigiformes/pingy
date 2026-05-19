@@ -230,6 +230,15 @@
             <Setter Property="Margin" Value="0,2,4,0"/>
         </Style>
 
+        <!-- Port pill: tiny status dot + :port[/label]. Border tint follows the per-port StateBrush. -->
+        <Style x:Key="PortPill" TargetType="Border">
+            <Setter Property="BorderBrush" Value="#5500F0FF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="#100B1326"/>
+            <Setter Property="Padding" Value="4,1"/>
+            <Setter Property="Margin" Value="0,2,4,0"/>
+        </Style>
+
         <Style x:Key="FilterChip" TargetType="ToggleButton">
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
             <Setter Property="FontSize" Value="9"/>
@@ -701,9 +710,10 @@
                                                 </StackPanel>
                                             </Grid>
 
-                                            <!-- Bottom: tags + sparkline / dot strip -->
+                                            <!-- Bottom: tags + ports + sparkline / dot strip -->
                                             <Grid Grid.Row="2" Margin="8,0,8,8">
                                                 <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
                                                     <RowDefinition Height="Auto"/>
                                                     <RowDefinition Height="Auto"/>
                                                 </Grid.RowDefinitions>
@@ -721,8 +731,48 @@
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
 
+                                                <!-- Port pills: each port gets a tiny status dot + :port[/label]. Tooltip shows last status + RTT. -->
+                                                <ItemsControl Grid.Row="1"
+                                                              ItemsSource="{Binding Ports}"
+                                                              Margin="0,0,0,4"
+                                                              Visibility="{Binding HasPorts, Converter={StaticResource BoolToVis}}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="{x:Type vm:PortStatusViewModel}">
+                                                            <Border Style="{StaticResource PortPill}" BorderBrush="{Binding StateBrush}">
+                                                                <Border.ToolTip>
+                                                                    <ToolTip>
+                                                                        <TextBlock>
+                                                                            <Run Text="port "/>
+                                                                            <Run Text="{Binding Number, Mode=OneWay}"/>
+                                                                            <Run Text=" — "/>
+                                                                            <Run Text="{Binding StateBadge, Mode=OneWay}"/>
+                                                                            <Run Text=" ("/>
+                                                                            <Run Text="{Binding LastStatus, Mode=OneWay}"/>
+                                                                            <Run Text=") "/>
+                                                                            <Run Text="{Binding RttDisplay, Mode=OneWay}"/>
+                                                                        </TextBlock>
+                                                                    </ToolTip>
+                                                                </Border.ToolTip>
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <Ellipse Width="6" Height="6"
+                                                                             Fill="{Binding StateBrush}"
+                                                                             VerticalAlignment="Center"
+                                                                             Margin="0,0,4,0"/>
+                                                                    <TextBlock Text="{Binding Display}"
+                                                                               FontSize="9"
+                                                                               FontFamily="Cascadia Mono, Consolas"
+                                                                               Foreground="{Binding StateBrush}"/>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+
                                                 <!-- VIZ: polyline (animations ON) -->
-                                                <Grid Grid.Row="1" Height="28"
+                                                <Grid Grid.Row="2" Height="28"
                                                       Visibility="{Binding DataContext.AnimationsEnabled, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
                                                     <Border BorderBrush="#1500F0FF" BorderThickness="1" Background="#080B16"/>
                                                     <Line Stroke="#3300F0FF" StrokeThickness="0.5" StrokeDashArray="2,4" X1="0" X2="600" Y1="14" Y2="14" Stretch="Fill" HorizontalAlignment="Stretch"/>
@@ -730,7 +780,7 @@
                                                 </Grid>
 
                                                 <!-- VIZ: dot strip (animations OFF) -->
-                                                <ItemsControl Grid.Row="1"
+                                                <ItemsControl Grid.Row="2"
                                                               ItemsSource="{Binding RecentDots}"
                                                               Height="10"
                                                               HorizontalAlignment="Stretch"
