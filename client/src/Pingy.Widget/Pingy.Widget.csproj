@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\Pingy.Core\Pingy.Core.csproj" />
@@ -15,6 +15,23 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- WinForms is enabled only for System.Windows.Forms.NotifyIcon (system tray).
+         It ships with the .NET Desktop runtime already bundled in the self-contained
+         build — no new NuGet dependency, air-gap clean. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\pingy.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <!-- Drop the WinForms implicit global usings: this is a WPF app and the bare
+       names (Application, MessageBox, ...) would collide with System.Windows.
+       The one file that needs WinForms (TrayIcon.cs) imports it explicitly. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\pingy.ico" />
+  </ItemGroup>
 
 </Project>

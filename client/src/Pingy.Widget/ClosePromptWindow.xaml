@@ -1,0 +1,177 @@
+<Window x:Class="Pingy.Widget.ClosePromptWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="CLOSE PINGY"
+        Width="440"
+        SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="Transparent"
+        WindowStartupLocation="CenterOwner"
+        TextOptions.TextFormattingMode="Display">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="0" CornerRadius="0"
+                      GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Color x:Key="Cyan">#FF00F0FF</Color>
+        <Color x:Key="Magenta">#FFFF2E63</Color>
+        <SolidColorBrush x:Key="CyanBrush" Color="{StaticResource Cyan}"/>
+        <SolidColorBrush x:Key="MagentaBrush" Color="{StaticResource Magenta}"/>
+        <SolidColorBrush x:Key="DimBrush" Color="#FF5C6F94"/>
+        <SolidColorBrush x:Key="BrightBrush" Color="#FFD9F4FF"/>
+        <SolidColorBrush x:Key="VoidBrush" Color="#FF050810"/>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
+            <Setter Property="Foreground" Value="{StaticResource BrightBrush}"/>
+        </Style>
+
+        <!-- Big option button: bordered box with a bold title + dim subtitle. -->
+        <Style x:Key="OptionButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                BorderBrush="{StaticResource DimBrush}"
+                                BorderThickness="1"
+                                Background="Transparent"
+                                Padding="14,10">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#1500F0FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryOptionButton" TargetType="Button" BasedOn="{StaticResource OptionButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                BorderBrush="{StaticResource CyanBrush}"
+                                BorderThickness="1"
+                                Background="#2200F0FF"
+                                Padding="14,10">
+                            <Border.Effect>
+                                <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="10" ShadowDepth="0" Opacity="0.6"/>
+                            </Border.Effect>
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#4400F0FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Remember toggle chip -->
+        <Style x:Key="RememberChip" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="Box" Width="14" Height="14"
+                                    BorderBrush="{StaticResource DimBrush}" BorderThickness="1"
+                                    Background="Transparent" VerticalAlignment="Center">
+                                <TextBlock x:Name="Tick" Text="✓" FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource CyanBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                            </Border>
+                            <TextBlock Text="REMEMBER MY CHOICE" FontSize="10"
+                                       Foreground="{StaticResource DimBrush}"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
+                                <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border BorderBrush="{StaticResource CyanBrush}" BorderThickness="1" Background="{StaticResource VoidBrush}">
+        <Border.Effect>
+            <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="18" ShadowDepth="0" Opacity="0.6"/>
+        </Border.Effect>
+        <Grid Margin="22,16,22,18">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Title bar -->
+            <Grid Grid.Row="0" Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="◎" FontSize="18" FontWeight="Bold" Foreground="{StaticResource CyanBrush}" Margin="0,-2,8,0"/>
+                    <TextBlock Text="CLOSE PINGY" FontSize="15" FontWeight="Bold" Foreground="{StaticResource CyanBrush}">
+                        <TextBlock.Effect>
+                            <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="8" ShadowDepth="0" Opacity="0.8"/>
+                        </TextBlock.Effect>
+                    </TextBlock>
+                </StackPanel>
+                <Button Grid.Column="1" Content="✕" Width="26" Height="20"
+                        Background="Transparent" BorderBrush="{StaticResource DimBrush}" BorderThickness="1"
+                        Foreground="{StaticResource DimBrush}" Cursor="Hand" Click="Cancel_Click"/>
+            </Grid>
+
+            <!-- Message -->
+            <TextBlock Grid.Row="1" Margin="0,14,0,2"
+                       FontSize="12" TextWrapping="Wrap"
+                       Foreground="{StaticResource BrightBrush}"
+                       Text="You closed the Pingy window. What should happen next?"/>
+
+            <!-- Option: minimize to tray -->
+            <Button Grid.Row="2" Style="{StaticResource PrimaryOptionButton}" Click="MinimizeToTray_Click" IsDefault="True">
+                <StackPanel>
+                    <TextBlock Text="MINIMIZE TO TRAY" FontSize="13" FontWeight="Bold" Foreground="{StaticResource CyanBrush}"/>
+                    <TextBlock Text="Keep monitoring in the background. Reopen from the system tray."
+                               FontSize="10" Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Option: exit -->
+            <Button Grid.Row="3" Style="{StaticResource OptionButton}" Click="Exit_Click">
+                <StackPanel>
+                    <TextBlock Text="EXIT PINGY" FontSize="13" FontWeight="Bold" Foreground="{StaticResource BrightBrush}"/>
+                    <TextBlock Text="Stop monitoring and close the application completely."
+                               FontSize="10" Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Button>
+
+            <!-- Remember -->
+            <CheckBox Grid.Row="4" x:Name="RememberToggle" Style="{StaticResource RememberChip}"
+                      IsChecked="True" Margin="0,16,0,0"
+                      ToolTip="When checked, Pingy won't ask again. Delete config\settings.json to be asked once more."/>
+        </Grid>
+    </Border>
+</Window>

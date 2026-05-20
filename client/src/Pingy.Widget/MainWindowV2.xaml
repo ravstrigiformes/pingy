@@ -6,6 +6,7 @@
         xmlns:ctl="clr-namespace:Pingy.Widget.Controls"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         Title="PINGY // V2"
+        Icon="Assets/pingy.ico"
         Width="900" Height="560"
         MinWidth="360" MinHeight="280"
         Topmost="{Binding IsTopmost}"

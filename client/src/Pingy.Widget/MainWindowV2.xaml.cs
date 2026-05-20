@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -10,6 +11,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
+using Pingy.Widget.Settings;
 using Pingy.Widget.ViewModels;
 
 namespace Pingy.Widget;
@@ -20,6 +22,12 @@ public partial class MainWindowV2 : Window
 
     private MainViewModel? Vm => DataContext as MainViewModel;
 
+    private readonly SettingsStore _settingsStore = new();
+    private AppSettings _settings = new();
+    private TrayIcon? _trayIcon;
+    private bool _forceExit;     // set when an exit is genuine (tray "Exit" / chosen Exit)
+    private bool _balloonShown;  // tray hint balloon — once per session is enough
+
     public MainWindowV2()
     {
         InitializeComponent();
@@ -29,6 +37,12 @@ public partial class MainWindowV2 : Window
 
         Loaded += async (_, _) =>
         {
+            _settings = _settingsStore.Load();
+            _trayIcon = new TrayIcon(
+                onSingleClick: GlanceFromTray,
+                onDoubleClick: RestoreFromTray,
+                onExit: ExitFromTray);
+
             if (app.ViewModel is not null)
                 await app.ViewModel.StartAsync();
             StartScanlineAnimation();
@@ -65,6 +79,102 @@ public partial class MainWindowV2 : Window
         WindowState = WindowState.Minimized;
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    // -- Close behaviour / system tray ----------------------------------
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+
+        // A genuine exit (tray "Exit", or the user chose Exit) — let it close.
+        if (_forceExit) return;
+
+        var behavior = _settings.CloseBehavior;
+
+        // First close ever: ask, and persist the answer if the user opts to.
+        if (behavior == CloseBehavior.Ask)
+        {
+            var dlg = new ClosePromptWindow { Owner = this };
+            var confirmed = dlg.ShowDialog();
+            if (confirmed != true || dlg.Choice is null)
+            {
+                e.Cancel = true;   // dismissed — treat as "I didn't mean to close"
+                return;
+            }
+
+            behavior = dlg.Choice.Value;
+            if (dlg.Remember)
+            {
+                _settings = _settings with { CloseBehavior = behavior };
+                _settingsStore.Save(_settings);
+            }
+        }
+
+        if (behavior == CloseBehavior.MinimizeToTray)
+        {
+            e.Cancel = true;
+            MinimizeToTray();
+        }
+        // CloseBehavior.Exit — fall through; the window closes normally.
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _trayIcon?.Dispose();
+        _trayIcon = null;
+        base.OnClosed(e);
+    }
+
+    private void MinimizeToTray()
+    {
+        Hide();
+        if (!_balloonShown)
+        {
+            _trayIcon?.ShowBalloon(
+                "Pingy is monitoring from the tray — single-click to glance, double-click to open.");
+            _balloonShown = true;
+        }
+    }
+
+    // Single-click on the tray icon: pop up the compact mini view, docked near the
+    // tray, for a quick glance at network status without restoring the full window.
+    private void GlanceFromTray()
+    {
+        if (Vm is null) return;
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+
+        // GoToMini saves the full-mode footprint so a later restore is correct.
+        if (!Vm.IsMiniMode) GoToMini();
+
+        // Force the compact glance footprint (mini may have been snapped tall before)
+        // and dock it to the work-area's bottom-right corner, next to the tray.
+        Width = MiniWidth;
+        Height = MiniHeight;
+        var wa = SystemParameters.WorkArea;
+        Left = wa.Right - MiniWidth - 12;
+        Top = wa.Bottom - MiniHeight - 12;
+
+        Show();
+        Activate();
+    }
+
+    // Double-click on the tray icon: open the full window.
+    private void RestoreFromTray()
+    {
+        if (Vm is null) return;
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+
+        if (Vm.IsMiniMode) GoToFull();   // restores the saved full-mode footprint
+
+        Show();
+        Activate();
+    }
+
+    private void ExitFromTray()
+    {
+        _forceExit = true;
+        Close();
+    }
 
     // -- Toolbar handlers ------------------------------------------------
 
