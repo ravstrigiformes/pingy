@@ -26,12 +26,16 @@ public partial class App : Application
         var loader = new JsonTargetLoader();
         var pinger = new Pinger();
         var portProbe = new TcpPortProbe();
-        ViewModel = new MainViewModel(pinger, portProbe, loader);
+        _serviceCheck = new HttpServiceCheck();
+        ViewModel = new MainViewModel(pinger, portProbe, _serviceCheck, loader);
     }
+
+    private HttpServiceCheck? _serviceCheck;
 
     protected override void OnExit(ExitEventArgs e)
     {
         ViewModel?.Stop();
+        _serviceCheck?.Dispose();
         CrashLogger.Log("exit", null, $"ExitCode={e.ApplicationExitCode}");
         base.OnExit(e);
     }

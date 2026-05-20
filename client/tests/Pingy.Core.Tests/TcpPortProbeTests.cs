@@ -22,7 +22,7 @@ public class TcpPortProbeTests
 
             var result = await probe.ProbeAsync(Loopback(), port, TimeSpan.FromSeconds(2));
 
-            Assert.True(result.Success, $"Expected Connected, got {result.Status}");
+            Assert.True(result.Connected, $"Expected Connected, got {result.Status}");
             Assert.Equal("Connected", result.Status);
             Assert.Equal(port, result.Port);
             Assert.NotNull(result.RttMs);
@@ -45,7 +45,7 @@ public class TcpPortProbeTests
         var probe = new TcpPortProbe();
         var result = await probe.ProbeAsync(Loopback(), port, TimeSpan.FromSeconds(2));
 
-        Assert.False(result.Success);
+        Assert.False(result.Connected);
         // On Windows loopback a closed port reliably yields ConnectionRefused; accept Timeout too
         // in case the test host treats it differently (defensive — we only care that we DON'T claim Connected).
         Assert.Contains(result.Status, new[] { "Refused", "Timeout" });
@@ -57,7 +57,7 @@ public class TcpPortProbeTests
         var probe = new TcpPortProbe();
         var result = await probe.ProbeAsync(Loopback(), 0, TimeSpan.FromSeconds(2));
 
-        Assert.False(result.Success);
+        Assert.False(result.Connected);
         Assert.Equal("InvalidPort", result.Status);
     }
 }

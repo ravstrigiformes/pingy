@@ -4,5 +4,5 @@ namespace Pingy.Core.Probing;
 
 public interface IPortProbe
 {
-    Task<PortProbeResult> ProbeAsync(Target target, int port, TimeSpan timeout, CancellationToken ct = default);
+    Task<TcpProbeResult> ProbeAsync(Target target, int port, TimeSpan timeout, CancellationToken ct = default);
 }

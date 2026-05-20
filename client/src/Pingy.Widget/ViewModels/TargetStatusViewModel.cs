@@ -232,9 +232,17 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         else if (!sawAny) accent = Tier.Fail; // window is entirely timeouts but <= grace? still all-fail
         else accent = worstNonFail;
 
-        // Any monitored port that has reported and is currently closed pushes the card to Fail
-        // — a closed port the user opted to watch is a real signal, not a footnote.
-        if (Ports.Any(p => p.HasResult && !p.LastWasOpen)) accent = Tier.Fail;
+        // Port health rolls into the card accent. A DOWN port (TCP refused/timeout) is a
+        // hard failure regardless of ICMP. A DEGRADED port (TCP up, L7 check failing) only
+        // bumps the card to Poor/amber when ICMP itself is up — if ICMP is down the window
+        // already produced Fail and that red wins.
+        bool anyPortDown = Ports.Any(p => p.HasResult && p.LastHealth == PortHealth.Down);
+        bool anyPortDegraded = Ports.Any(p => p.HasResult && p.LastHealth == PortHealth.Degraded);
+
+        if (anyPortDown)
+            accent = Tier.Fail;
+        else if (anyPortDegraded && LastWasSuccess && accent < Tier.Poor)
+            accent = Tier.Poor;
 
         AccentBrush = BrushFor(accent);
     }

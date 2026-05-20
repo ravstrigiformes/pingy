@@ -731,7 +731,8 @@
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
 
-                                                <!-- Port pills: each port gets a tiny status dot + :port[/label]. Tooltip shows last status + RTT. -->
+                                                <!-- Port pills: tiny status dot + :port[/label] + state badge. Tri-tone:
+                                                     cyan OK / amber DEGR (L7 failing) / magenta DOWN. Tooltip shows L4+L7 detail. -->
                                                 <ItemsControl Grid.Row="1"
                                                               ItemsSource="{Binding Ports}"
                                                               Margin="0,0,0,4"
@@ -741,21 +742,9 @@
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate DataType="{x:Type vm:PortStatusViewModel}">
-                                                            <Border Style="{StaticResource PortPill}" BorderBrush="{Binding StateBrush}">
-                                                                <Border.ToolTip>
-                                                                    <ToolTip>
-                                                                        <TextBlock>
-                                                                            <Run Text="port "/>
-                                                                            <Run Text="{Binding Number, Mode=OneWay}"/>
-                                                                            <Run Text=" — "/>
-                                                                            <Run Text="{Binding StateBadge, Mode=OneWay}"/>
-                                                                            <Run Text=" ("/>
-                                                                            <Run Text="{Binding LastStatus, Mode=OneWay}"/>
-                                                                            <Run Text=") "/>
-                                                                            <Run Text="{Binding RttDisplay, Mode=OneWay}"/>
-                                                                        </TextBlock>
-                                                                    </ToolTip>
-                                                                </Border.ToolTip>
+                                                            <Border Style="{StaticResource PortPill}"
+                                                                    BorderBrush="{Binding StateBrush}"
+                                                                    ToolTip="{Binding Tooltip}">
                                                                 <StackPanel Orientation="Horizontal">
                                                                     <Ellipse Width="6" Height="6"
                                                                              Fill="{Binding StateBrush}"
@@ -765,6 +754,13 @@
                                                                                FontSize="9"
                                                                                FontFamily="Cascadia Mono, Consolas"
                                                                                Foreground="{Binding StateBrush}"/>
+                                                                    <TextBlock Text="{Binding StateBadge}"
+                                                                               FontSize="8"
+                                                                               FontWeight="Bold"
+                                                                               FontFamily="Cascadia Mono, Consolas"
+                                                                               Foreground="{Binding StateBrush}"
+                                                                               VerticalAlignment="Center"
+                                                                               Margin="5,0,0,0"/>
                                                                 </StackPanel>
                                                             </Border>
                                                         </DataTemplate>

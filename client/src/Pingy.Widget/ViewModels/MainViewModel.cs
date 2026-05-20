@@ -23,6 +23,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private readonly IPinger _pinger;
     private readonly IPortProbe _portProbe;
+    private readonly IServiceCheck _serviceCheck;
     private readonly ITargetLoader _loader;
     private CancellationTokenSource? _cts;
     private TargetsConfig? _currentConfig;
@@ -90,10 +91,11 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private SortChoice _selectedSort;
 
-    public MainViewModel(IPinger pinger, IPortProbe portProbe, ITargetLoader loader)
+    public MainViewModel(IPinger pinger, IPortProbe portProbe, IServiceCheck serviceCheck, ITargetLoader loader)
     {
         _pinger = pinger;
         _portProbe = portProbe;
+        _serviceCheck = serviceCheck;
         _loader = loader;
         ConfigPath = loader.ConfigPath;
 
@@ -287,11 +289,14 @@ public sealed partial class MainViewModel : ObservableObject
                               .ToArray()
                           ?? System.Array.Empty<string>();
 
-        // De-dupe ports by number, keep first label seen, drop out-of-range.
+        // De-dupe ports by number, keep first label and first check seen, drop out-of-range.
         var cleanedPorts = ports?
             .Where(p => p.Number is > 0 and <= 65535)
             .GroupBy(p => p.Number)
-            .Select(g => new TargetPort(g.Key, g.Select(x => x.Label).FirstOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim()))
+            .Select(g => new TargetPort(
+                g.Key,
+                g.Select(x => x.Label).FirstOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim(),
+                g.Select(x => x.Check).FirstOrDefault(c => c is not null)))
             .ToArray();
 
         return new Target(
@@ -438,8 +443,8 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var tvm in snapshot)
         {
             tasks.Add(ProbeIcmpAsync(tvm, timeout, ct));
-            foreach (var port in tvm.Target.Ports ?? System.Array.Empty<Pingy.Core.Models.TargetPort>())
-                tasks.Add(ProbePortAsync(tvm, port.Number, timeout, ct));
+            foreach (var port in tvm.Target.Ports ?? System.Array.Empty<TargetPort>())
+                tasks.Add(ProbePortAsync(tvm, port, timeout, ct));
         }
 
         await Task.WhenAll(tasks);
@@ -461,17 +466,40 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private async Task ProbePortAsync(TargetStatusViewModel tvm, int port, System.TimeSpan timeout, CancellationToken ct)
+    private async Task ProbePortAsync(TargetStatusViewModel tvm, TargetPort port, System.TimeSpan timeout, CancellationToken ct)
     {
         try
         {
-            var result = await _portProbe.ProbeAsync(tvm.Target, port, timeout, ct);
-            Application.Current?.Dispatcher.Invoke(() => tvm.UpdatePort(result));
+            var tcp = await _portProbe.ProbeAsync(tvm.Target, port.Number, timeout, ct);
+
+            PortProbeResult combined;
+            if (!tcp.Connected)
+            {
+                combined = new PortProbeResult(tvm.Target.Id, port.Number,
+                    PortHealth.Down, null, null, tcp.Status, null, tcp.At);
+            }
+            else if (port.Check is null)
+            {
+                combined = new PortProbeResult(tvm.Target.Id, port.Number,
+                    PortHealth.Ok, tcp.RttMs, null, tcp.Status, null, tcp.At);
+            }
+            else
+            {
+                var l7Timeout = port.Check.TimeoutMs is int ms
+                    ? System.TimeSpan.FromMilliseconds(ms)
+                    : timeout;
+                var l7 = await _serviceCheck.CheckAsync(tvm.Target, port, l7Timeout, ct);
+                combined = new PortProbeResult(tvm.Target.Id, port.Number,
+                    l7.Ok ? PortHealth.Ok : PortHealth.Degraded,
+                    tcp.RttMs, l7.RttMs, tcp.Status, l7.Status, System.DateTimeOffset.UtcNow);
+            }
+
+            Application.Current?.Dispatcher.Invoke(() => tvm.UpdatePort(combined));
         }
         catch (System.OperationCanceledException) { }
         catch (System.Exception ex)
         {
-            Pingy.Widget.CrashLogger.Log("probe.port", ex, $"target={tvm.Target.Id} host={tvm.Target.Host} port={port}");
+            Pingy.Widget.CrashLogger.Log("probe.port", ex, $"target={tvm.Target.Id} host={tvm.Target.Host} port={port.Number}");
         }
     }
 

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Pingy.Widget.ViewModels"
         Title="ADD TARGET"
-        Height="510" Width="520"
+        Height="620" Width="520"
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize"
@@ -243,6 +243,16 @@
 
                 <TextBlock Style="{StaticResource LabelStyle}" Text="PORTS  e.g.  80, 443, 5173:vite, 8080:api" Margin="0,12,0,4"/>
                 <TextBox x:Name="PortsBox" TabIndex="3"/>
+
+                <TextBlock Style="{StaticResource LabelStyle}"
+                           Text="PORT CHECKS  (one per line:  &lt;port&gt; &lt;http|https&gt; &lt;path&gt; [status=NNN] [insecure])"
+                           Margin="0,12,0,4"/>
+                <TextBox x:Name="ChecksBox" TabIndex="4"
+                         AcceptsReturn="True"
+                         AcceptsTab="False"
+                         Height="68"
+                         VerticalContentAlignment="Top"
+                         VerticalScrollBarVisibility="Auto"/>
             </StackPanel>
 
             <Grid Grid.Row="8" Margin="0,16,0,0">
@@ -259,10 +269,10 @@
                         Visibility="Collapsed"
                         Foreground="{StaticResource MagentaBrush}"
                         BorderBrush="{StaticResource MagentaBrush}"
-                        TabIndex="6"/>
+                        TabIndex="7"/>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="CANCEL" Style="{StaticResource ActionButton}" Click="CancelButton_Click" TabIndex="5"/>
-                    <Button x:Name="SaveButton" Content="SAVE" Style="{StaticResource PrimaryButton}" Click="SaveButton_Click" TabIndex="4" IsDefault="True"/>
+                    <Button Content="CANCEL" Style="{StaticResource ActionButton}" Click="CancelButton_Click" TabIndex="6"/>
+                    <Button x:Name="SaveButton" Content="SAVE" Style="{StaticResource PrimaryButton}" Click="SaveButton_Click" TabIndex="5" IsDefault="True"/>
                 </StackPanel>
             </Grid>
         </Grid>
