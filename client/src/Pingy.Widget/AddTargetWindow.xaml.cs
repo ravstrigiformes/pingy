@@ -21,6 +21,7 @@ public partial class AddTargetWindow : Window
 
     public string LabelText => LabelBox.Text;
     public string HostText => HostBox.Text;
+    public string OwnerText => OwnerBox.Text;
 
     public Target? EditingTarget { get; }
     public bool IsEditing => EditingTarget is not null;
@@ -50,6 +51,7 @@ public partial class AddTargetWindow : Window
             TitleText.Text = "EDIT TARGET";
             ActionVerb.Text = "+";
             LabelBox.Text = editing.Label ?? editing.Host;
+            OwnerBox.Text = editing.Owner ?? "";
             HostBox.Text = editing.Host;
             CustomTagsBox.Text = string.Join(", ", extras);
             PortsBox.Text = FormatPorts(editing.Ports);

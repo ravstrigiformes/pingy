@@ -231,6 +231,17 @@
             <Setter Property="Margin" Value="0,2,4,0"/>
         </Style>
 
+        <!-- Owner / responsible-party pill: deliberately dim grey — metadata, not health.
+             Distinct from cyan tag pills and magenta status badges. -->
+        <Style x:Key="OwnerPill" TargetType="Border">
+            <Setter Property="BorderBrush" Value="#445C6F94"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="#22151C2E"/>
+            <Setter Property="Padding" Value="3,0"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
         <!-- Port pill: tiny status dot + :port[/label]. Border tint follows the per-port StateBrush. -->
         <Style x:Key="PortPill" TargetType="Border">
             <Setter Property="BorderBrush" Value="#5500F0FF"/>
@@ -542,6 +553,18 @@
                         <TextBlock Style="{StaticResource LabelText}" Text="s [1–300]" VerticalAlignment="Center"/>
                     </StackPanel>
 
+                    <!-- Display cycler: swaps every card's big number between current latency and average -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                        <TextBlock Style="{StaticResource LabelText}" Text="DISPLAY " VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ChromeButton}" Click="StatCycle_Click" MinWidth="58"
+                                ToolTip="Swap every card's big number between current latency and the window average">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="↻ " FontSize="10" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding StatDisplayLabel}" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
                     <!-- Zoom stepper -->
                     <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                         <TextBlock Style="{StaticResource LabelText}" Text="ZOOM " VerticalAlignment="Center"/>
@@ -684,21 +707,95 @@
                                                                FontSize="13" FontWeight="Bold"
                                                                Foreground="{StaticResource TextBrightBrush}"
                                                                TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{Binding Host}"
-                                                               FontSize="10"
-                                                               FontFamily="Cascadia Mono, Consolas"
-                                                               Foreground="{StaticResource CyanBrush}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               Opacity="0.85"/>
+                                                    <!-- host (trims) + owner pill -->
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding Host}"
+                                                                   FontSize="10"
+                                                                   FontFamily="Cascadia Mono, Consolas"
+                                                                   Foreground="{StaticResource CyanBrush}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   VerticalAlignment="Center"
+                                                                   Opacity="0.85"/>
+                                                        <Border Grid.Column="1"
+                                                                Style="{StaticResource OwnerPill}"
+                                                                ToolTip="{Binding Owner}"
+                                                                Visibility="{Binding HasOwner, Converter={StaticResource BoolToVis}}">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="@"
+                                                                           FontSize="8" FontWeight="Bold"
+                                                                           Foreground="{StaticResource TextDimBrush}"
+                                                                           VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding Owner}"
+                                                                           FontSize="8"
+                                                                           FontFamily="Cascadia Mono, Consolas"
+                                                                           Foreground="{StaticResource TextDimBrush}"
+                                                                           VerticalAlignment="Center"
+                                                                           Margin="1,0,0,0"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
                                                 </StackPanel>
 
-                                                <!-- Right side: latency + status badge stacked -->
-                                                <StackPanel Grid.Column="3" Orientation="Vertical" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding RttDisplay}"
-                                                               FontSize="15" FontWeight="Bold"
-                                                               HorizontalAlignment="Right"
-                                                               Foreground="{Binding AccentBrush}"/>
-                                                    <Border BorderBrush="{Binding StateBrush}"
+                                                <!-- Right side: max/avg mini stack | big number + status badge -->
+                                                <Grid Grid.Column="3" VerticalAlignment="Center">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- MAX + secondary stat, small and dim -->
+                                                    <StackPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="MAX"
+                                                                       Style="{StaticResource LabelText}" FontSize="8"
+                                                                       VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                            <TextBlock Grid.Column="1" Text="{Binding MaxValue}"
+                                                                       FontSize="9" FontWeight="Bold"
+                                                                       Foreground="{StaticResource TextDimBrush}"
+                                                                       MinWidth="24" TextAlignment="Right"/>
+                                                        </Grid>
+                                                        <Grid Margin="0,1,0,0">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding SecondaryLabel}"
+                                                                       Style="{StaticResource LabelText}" FontSize="8"
+                                                                       VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                            <TextBlock Grid.Column="1" Text="{Binding SecondaryValue}"
+                                                                       FontSize="9" FontWeight="Bold"
+                                                                       Foreground="{StaticResource TextDimBrush}"
+                                                                       MinWidth="24" TextAlignment="Right"/>
+                                                        </Grid>
+                                                    </StackPanel>
+
+                                                    <!-- big number (+ AVG tag when showing the average) -->
+                                                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal"
+                                                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                        <TextBlock Text="AVG"
+                                                                   FontSize="7" FontWeight="Bold"
+                                                                   Foreground="{StaticResource YellowBrush}"
+                                                                   VerticalAlignment="Top" Margin="0,2,3,0"
+                                                                   Visibility="{Binding PrimaryIsAverage, Converter={StaticResource BoolToVis}}"/>
+                                                        <TextBlock Text="{Binding PrimaryValue}"
+                                                                   FontSize="15" FontWeight="Bold"
+                                                                   Foreground="{Binding PrimaryBrush}"/>
+                                                    </StackPanel>
+
+                                                    <Border Grid.Row="1" Grid.Column="1"
+                                                            BorderBrush="{Binding StateBrush}"
                                                             BorderThickness="1"
                                                             Padding="5,0"
                                                             HorizontalAlignment="Right"
@@ -708,7 +805,7 @@
                                                                    FontWeight="Bold"
                                                                    Foreground="{Binding StateBrush}"/>
                                                     </Border>
-                                                </StackPanel>
+                                                </Grid>
                                             </Grid>
 
                                             <!-- Bottom: tags + ports + sparkline / dot strip -->
@@ -768,12 +865,44 @@
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
 
-                                                <!-- VIZ: polyline (animations ON) -->
+                                                <!-- VIZ: latency line + timeout markers (animations ON) -->
                                                 <Grid Grid.Row="2" Height="28"
                                                       Visibility="{Binding DataContext.AnimationsEnabled, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
                                                     <Border BorderBrush="#1500F0FF" BorderThickness="1" Background="#080B16"/>
                                                     <Line Stroke="#3300F0FF" StrokeThickness="0.5" StrokeDashArray="2,4" X1="0" X2="600" Y1="14" Y2="14" Stretch="Fill" HorizontalAlignment="Stretch"/>
-                                                    <Polyline Points="{Binding LatencyPolyline}" Stroke="{Binding AccentBrush}" StrokeThickness="1.5" Stretch="Fill" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                                    <!-- Success-only latency line with true gaps at timeouts; the Viewbox
+                                                         scales the fixed 120x28 logical canvas to the card width. -->
+                                                    <Viewbox Stretch="Fill" Margin="1" IsHitTestVisible="False">
+                                                        <Canvas Width="120" Height="28">
+                                                            <Path Data="{Binding LatencyGeometry}"
+                                                                  Stroke="{Binding AccentBrush}"
+                                                                  StrokeThickness="1.5"
+                                                                  StrokeStartLineCap="Round"
+                                                                  StrokeEndLineCap="Round"
+                                                                  StrokeLineJoin="Round"/>
+                                                        </Canvas>
+                                                    </Viewbox>
+                                                    <!-- Timeout markers: a tiny magenta x per timed-out slot, in a top band.
+                                                         60 columns matches TargetStatusViewModel.Window. -->
+                                                    <ItemsControl ItemsSource="{Binding TimeoutFlags}"
+                                                                  Height="9" VerticalAlignment="Top"
+                                                                  Margin="1,1,1,0" IsHitTestVisible="False">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <UniformGrid Rows="1" Columns="60" HorizontalAlignment="Stretch"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <TextBlock Text="✕"
+                                                                           FontSize="6" FontWeight="Bold"
+                                                                           Foreground="{StaticResource MagentaBrush}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Top"
+                                                                           Visibility="{Binding Converter={StaticResource BoolToVis}}"/>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
                                                 </Grid>
 
                                                 <!-- VIZ: dot strip (animations OFF) -->

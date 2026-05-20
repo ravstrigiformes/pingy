@@ -73,6 +73,25 @@ public sealed partial class MainViewModel : ObservableObject
         };
     }
 
+    // Global toggle for the big number on every card: live latency (default) vs window average.
+    public enum StatDisplay { Current, Average }
+    [ObservableProperty] private StatDisplay _statDisplayMode = StatDisplay.Current;
+    public string StatDisplayLabel => StatDisplayMode == StatDisplay.Current ? "NOW" : "AVG";
+
+    partial void OnStatDisplayModeChanged(StatDisplay value)
+    {
+        OnPropertyChanged(nameof(StatDisplayLabel));
+        var avg = value == StatDisplay.Average;
+        foreach (var t in Targets) t.ShowAvgAsPrimary = avg;
+    }
+
+    public void CycleStatDisplay()
+    {
+        StatDisplayMode = StatDisplayMode == StatDisplay.Current
+            ? StatDisplay.Average
+            : StatDisplay.Current;
+    }
+
     public ObservableCollection<TargetStatusViewModel> Targets { get; } = new();
     public ICollectionView TargetsView { get; }
 
@@ -187,7 +206,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    public async Task<bool> AddTargetAsync(string label, string host, IReadOnlyList<string> tags, IReadOnlyList<TargetPort>? ports = null)
+    public async Task<bool> AddTargetAsync(string label, string host, IReadOnlyList<string> tags, IReadOnlyList<TargetPort>? ports = null, string? owner = null)
     {
         if (string.IsNullOrWhiteSpace(host)) return false;
         if (_currentConfig is null) return false;
@@ -196,7 +215,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (Targets.Any(t => t.Target.Id == id))
             id = $"{id}-{System.Guid.NewGuid().ToString("N")[..4]}";
 
-        var newTarget = BuildTarget(id, label, host, tags, ports);
+        var newTarget = BuildTarget(id, label, host, tags, ports, owner);
         var updated = _currentConfig with { Targets = _currentConfig.Targets.Concat(new[] { newTarget }).ToArray() };
         await _loader.SaveAsync(updated);
         _currentConfig = updated;
@@ -208,13 +227,13 @@ public sealed partial class MainViewModel : ObservableObject
         return true;
     }
 
-    public async Task<bool> UpdateTargetAsync(string id, string label, string host, IReadOnlyList<string> tags, IReadOnlyList<TargetPort>? ports = null)
+    public async Task<bool> UpdateTargetAsync(string id, string label, string host, IReadOnlyList<string> tags, IReadOnlyList<TargetPort>? ports = null, string? owner = null)
     {
         if (_currentConfig is null) return false;
         var existingIdx = Targets.ToList().FindIndex(t => t.Target.Id == id);
         if (existingIdx < 0) return false;
 
-        var updatedTarget = BuildTarget(id, label, host, tags, ports);
+        var updatedTarget = BuildTarget(id, label, host, tags, ports, owner);
         var newList = _currentConfig.Targets.ToArray();
         var configIdx = System.Array.FindIndex(newList, t => t.Id == id);
         if (configIdx < 0) return false;
@@ -231,7 +250,10 @@ public sealed partial class MainViewModel : ObservableObject
         {
             // Different network entity — reset sample history.
             existingVm.PropertyChanged -= OnTargetPropertyChanged;
-            var newVm = new TargetStatusViewModel(updatedTarget);
+            var newVm = new TargetStatusViewModel(updatedTarget)
+            {
+                ShowAvgAsPrimary = StatDisplayMode == StatDisplay.Average,
+            };
             newVm.PropertyChanged += OnTargetPropertyChanged;
             Targets[existingIdx] = newVm;
         }
@@ -275,12 +297,15 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void AddTargetVm(Target t)
     {
-        var vm = new TargetStatusViewModel(t);
+        var vm = new TargetStatusViewModel(t)
+        {
+            ShowAvgAsPrimary = StatDisplayMode == StatDisplay.Average,
+        };
         vm.PropertyChanged += OnTargetPropertyChanged;
         Targets.Add(vm);
     }
 
-    private static Target BuildTarget(string id, string label, string host, IReadOnlyList<string> tags, IReadOnlyList<TargetPort>? ports)
+    private static Target BuildTarget(string id, string label, string host, IReadOnlyList<string> tags, IReadOnlyList<TargetPort>? ports, string? owner)
     {
         var primaryKind = (tags?.FirstOrDefault() ?? "host").ToLowerInvariant();
         var cleanedTags = tags?.Where(t => !string.IsNullOrWhiteSpace(t))
@@ -305,7 +330,8 @@ public sealed partial class MainViewModel : ObservableObject
             Kind: primaryKind,
             Label: string.IsNullOrWhiteSpace(label) ? host : label.Trim(),
             Tags: cleanedTags,
-            Ports: cleanedPorts is { Length: > 0 } ? cleanedPorts : null);
+            Ports: cleanedPorts is { Length: > 0 } ? cleanedPorts : null,
+            Owner: string.IsNullOrWhiteSpace(owner) ? null : owner.Trim());
     }
 
     private void OnTargetPropertyChanged(object? sender, PropertyChangedEventArgs e)

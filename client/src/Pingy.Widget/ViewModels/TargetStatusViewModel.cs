@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -13,22 +14,28 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     public const int HistoryCapacity = 90;
     public const int FullDotsCount = 60;
     public const int MiniDotsCount = 30;
-    private const double FailedRtt = 600.0;
+
+    // The single window used for the chart, the color rule, and the max/avg stats.
+    // Keep XAML's marker UniformGrid Columns in sync with this (60).
+    private const int Window = FullDotsCount;
+
     private const double ChartWidth = 120.0;
     private const double ChartHeight = 28.0;
-    private const double MaxRttMs = 600.0;
+    private const double ChartPad = 3.0;
 
-    // Number of timeouts tolerated within the displayed window before they
-    // influence the worst-of-window color. <= this many timeouts are treated
-    // as transient blips and skipped when computing the row's accent.
-    private const int RtoGraceCount = 2;
+    // Timeout color thresholds, evaluated over the most-recent Window samples.
+    //   run of >= RtoRedRun consecutive timeouts        -> red
+    //   >= RtoRedTotal total timeouts in the window     -> red
+    //   any timeout(s) present but below both           -> amber (never green)
+    private const int RtoRedRun = 3;
+    private const int RtoRedTotal = 6;
 
     // Latency tiers — sorted ascending severity (LAN best, FAIL worst).
     public enum Tier { Lan = 0, Good = 1, Fair = 2, Poor = 3, Bad = 4, Fail = 5, Unknown = -1 }
 
     private static readonly Brush LanBrush = MakeBrush(0x00, 0xF0, 0xFF); // cyan
     private static readonly Brush GoodBrush = MakeBrush(0x22, 0xC5, 0x5E); // green
-    private static readonly Brush FairBrush = MakeBrush(0xFF, 0xE6, 0x00); // yellow
+    private static readonly Brush FairBrush = MakeBrush(0xFF, 0xE6, 0x00); // yellow (amber)
     private static readonly Brush PoorBrush = MakeBrush(0xFF, 0x8C, 0x00); // orange
     private static readonly Brush BadBrush = MakeBrush(0xFF, 0x2E, 0x63); // red/magenta
     private static readonly Brush FailBrush = MakeBrush(0xFF, 0x2E, 0x63); // same as bad
@@ -46,12 +53,17 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     };
 
     private readonly Queue<Sample> _samples = new(HistoryCapacity);
+    private bool _hasResult;
+    private double? _avgMs;
+    private double? _maxMs;
 
     [ObservableProperty] private Target _target;
     public string Host => Target.Host;
     public string Kind => Target.Kind;
     public string Label => string.IsNullOrWhiteSpace(Target.Label) ? Target.Host : Target.Label!;
-    public IReadOnlyList<string> Tags => Target.Tags ?? System.Array.Empty<string>();
+    public IReadOnlyList<string> Tags => Target.Tags ?? Array.Empty<string>();
+    public string? Owner => Target.Owner;
+    public bool HasOwner => !string.IsNullOrWhiteSpace(Target.Owner);
 
     public ObservableCollection<PortStatusViewModel> Ports { get; } = new();
     public bool HasPorts => Ports.Count > 0;
@@ -62,6 +74,8 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         OnPropertyChanged(nameof(Kind));
         OnPropertyChanged(nameof(Label));
         OnPropertyChanged(nameof(Tags));
+        OnPropertyChanged(nameof(Owner));
+        OnPropertyChanged(nameof(HasOwner));
         SyncPorts(value.Ports);
     }
 
@@ -70,7 +84,7 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     // are added/removed in place.
     private void SyncPorts(IReadOnlyList<TargetPort>? desired)
     {
-        var want = desired ?? System.Array.Empty<TargetPort>();
+        var want = desired ?? Array.Empty<TargetPort>();
         var byNumber = Ports.ToDictionary(p => p.Number);
 
         // Remove ports no longer wanted.
@@ -92,7 +106,7 @@ public sealed partial class TargetStatusViewModel : ObservableObject
             }
             else
             {
-                Ports.Insert(System.Math.Min(i, Ports.Count), new PortStatusViewModel(want[i]));
+                Ports.Insert(Math.Min(i, Ports.Count), new PortStatusViewModel(want[i]));
             }
         }
 
@@ -102,13 +116,41 @@ public sealed partial class TargetStatusViewModel : ObservableObject
 
     [ObservableProperty] private string _state = "INIT";
     [ObservableProperty] private string _stateBadge = "—";
+    // Raw current-ping text: "12 MS" on success, "TIMEOUT" on a timed-out ping.
     [ObservableProperty] private string _rttDisplay = "—— MS";
     // Live status (UP/DOWN/INIT) — cyan/magenta/yellow. Used for the small status badge text only.
     [ObservableProperty] private Brush _stateBrush = UnknownBrush;
-    // Row accent: worst-tier brush computed from the displayed sample window (with RTO grace).
+    // Row accent: worst-tier brush computed from the displayed sample window.
     [ObservableProperty] private Brush _accentBrush = UnknownBrush;
-    [ObservableProperty] private System.DateTimeOffset _lastUpdate = System.DateTimeOffset.MinValue;
-    [ObservableProperty] private PointCollection _latencyPolyline = new();
+    [ObservableProperty] private DateTimeOffset _lastUpdate = DateTimeOffset.MinValue;
+
+    // Chart: success-only latency line (true gaps at timeouts) + per-slot timeout flags.
+    [ObservableProperty] private Geometry _latencyGeometry = Geometry.Empty;
+    public ObservableCollection<bool> TimeoutFlags { get; } = new();
+
+    // -- Primary number + max/avg stat stack (driven by the global cycler) --
+
+    [ObservableProperty] private string _maxValue = "—";       // window max (successful pings)
+    [ObservableProperty] private string _secondaryLabel = "AVG";
+    [ObservableProperty] private string _secondaryValue = "—";
+    [ObservableProperty] private string _primaryValue = "—— MS"; // the big number
+    [ObservableProperty] private Brush _primaryBrush = UnknownBrush;
+    [ObservableProperty] private bool _primaryIsAverage;          // drives the small "AVG" tag
+
+    // Set by MainViewModel's global cycler. True => the big number shows the window average.
+    private bool _showAvgAsPrimary;
+    public bool ShowAvgAsPrimary
+    {
+        get => _showAvgAsPrimary;
+        set
+        {
+            if (_showAvgAsPrimary == value) return;
+            _showAvgAsPrimary = value;
+            RefreshStatProjections();
+        }
+    }
+
+    partial void OnAccentBrushChanged(Brush value) => RefreshStatProjections();
 
     // For sorting / health rollup
     public double? LastRttMs { get; private set; }
@@ -150,24 +192,27 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     {
         State = result.Status.ToUpperInvariant();
         StateBadge = result.Success ? "UP" : "DOWN";
-        RttDisplay = result.Success ? $"{result.RttMs:F0} MS" : "—— MS";
+        RttDisplay = result.Success ? $"{result.RttMs:F0} MS" : "TIMEOUT";
         StateBrush = result.Success
             ? MakeBrush(0x00, 0xF0, 0xFF)   // live cyan for UP
             : MakeBrush(0xFF, 0x2E, 0x63);  // live magenta for DOWN
         LastUpdate = result.At;
         LastRttMs = result.RttMs;
         LastWasSuccess = result.Success;
+        _hasResult = true;
         OnPropertyChanged(nameof(RttSortKey));
         OnPropertyChanged(nameof(StatusSortKey));
 
-        var rtt = result.Success ? (result.RttMs ?? 0) : FailedRtt;
+        var rtt = result.Success ? (result.RttMs ?? 0) : 0;
         var tier = ComputeTier(result);
         _samples.Enqueue(new Sample(rtt, result.Success, tier));
         while (_samples.Count > HistoryCapacity) _samples.Dequeue();
 
-        LatencyPolyline = BuildPolyline();
+        LatencyGeometry = BuildLatencyGeometry();
         RebuildRecentDots();
+        RebuildTimeoutFlags();
         RecomputeAccent();
+        RecomputeStats();
     }
 
     // Tier thresholds (round-trip ms):
@@ -198,14 +243,26 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     private static void RebuildSlice(ObservableCollection<Brush> dest, Sample[] arr, int count)
     {
         dest.Clear();
-        var start = System.Math.Max(0, arr.Length - count);
+        var start = Math.Max(0, arr.Length - count);
         for (int i = start; i < arr.Length; i++)
             dest.Add(BrushFor(arr[i].Tier));
     }
 
-    // Accent = worst tier observed in the displayed window (FullDotsCount most-recent samples),
-    // with one quirk: up to RtoGraceCount timeouts are treated as transient blips and ignored.
-    // If more than RtoGraceCount timeouts occur in the window, FAIL wins outright.
+    // One bool per chart slot (oldest..newest), true where the ping timed out.
+    // Drives the magenta "x" marker overlay on the chart.
+    private void RebuildTimeoutFlags()
+    {
+        TimeoutFlags.Clear();
+        var arr = _samples.ToArray();
+        var start = Math.Max(0, arr.Length - Window);
+        for (int i = start; i < arr.Length; i++)
+            TimeoutFlags.Add(!arr[i].Ok);
+    }
+
+    // Accent color rule (evaluated over the most-recent Window samples):
+    //   run of >= RtoRedRun consecutive timeouts, OR >= RtoRedTotal total timeouts -> red
+    //   any timeout(s) present below those thresholds                              -> amber (>= Fair)
+    //   no timeouts                                                                -> worst latency tier
     private void RecomputeAccent()
     {
         if (_samples.Count == 0)
@@ -215,27 +272,39 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         }
 
         var arr = _samples.ToArray();
-        var start = System.Math.Max(0, arr.Length - FullDotsCount);
-        int failCount = 0;
-        Tier worstNonFail = Tier.Lan;
-        bool sawAny = false;
+        var start = Math.Max(0, arr.Length - Window);
+
+        int totalTimeouts = 0, run = 0, longestRun = 0;
+        Tier worstLatency = Tier.Lan;
+        bool sawSuccess = false;
         for (int i = start; i < arr.Length; i++)
         {
             var s = arr[i];
-            if (s.Tier == Tier.Fail) { failCount++; continue; }
-            sawAny = true;
-            if (s.Tier > worstNonFail) worstNonFail = s.Tier;
+            if (!s.Ok)
+            {
+                totalTimeouts++;
+                run++;
+                if (run > longestRun) longestRun = run;
+            }
+            else
+            {
+                run = 0;
+                sawSuccess = true;
+                if (s.Tier > worstLatency) worstLatency = s.Tier;
+            }
         }
 
         Tier accent;
-        if (failCount > RtoGraceCount) accent = Tier.Fail;
-        else if (!sawAny) accent = Tier.Fail; // window is entirely timeouts but <= grace? still all-fail
-        else accent = worstNonFail;
+        if (longestRun >= RtoRedRun || totalTimeouts >= RtoRedTotal)
+            accent = Tier.Fail;
+        else if (totalTimeouts > 0)
+            accent = (sawSuccess && worstLatency > Tier.Fair) ? worstLatency : Tier.Fair;
+        else
+            accent = sawSuccess ? worstLatency : Tier.Unknown;
 
         // Port health rolls into the card accent. A DOWN port (TCP refused/timeout) is a
         // hard failure regardless of ICMP. A DEGRADED port (TCP up, L7 check failing) only
-        // bumps the card to Poor/amber when ICMP itself is up — if ICMP is down the window
-        // already produced Fail and that red wins.
+        // bumps the card to Poor/amber when ICMP itself is up.
         bool anyPortDown = Ports.Any(p => p.HasResult && p.LastHealth == PortHealth.Down);
         bool anyPortDegraded = Ports.Any(p => p.HasResult && p.LastHealth == PortHealth.Degraded);
 
@@ -247,20 +316,109 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         AccentBrush = BrushFor(accent);
     }
 
-    private PointCollection BuildPolyline()
+    // Max + average over the successful pings in the window. Timeouts are excluded entirely
+    // so one blip can't wreck the average (and there is no out-of-band sentinel to skew it).
+    private void RecomputeStats()
     {
-        var pts = new PointCollection();
         var arr = _samples.ToArray();
-        if (arr.Length == 0) return pts;
-
-        for (int i = 0; i < arr.Length; i++)
+        var start = Math.Max(0, arr.Length - Window);
+        double sum = 0, max = double.MinValue;
+        int n = 0;
+        for (int i = start; i < arr.Length; i++)
         {
-            var x = arr.Length == 1 ? ChartWidth : (double)i / (arr.Length - 1) * ChartWidth;
-            var clamped = System.Math.Min(System.Math.Max(arr[i].Rtt, 0), MaxRttMs);
-            var y = ChartHeight - (clamped / MaxRttMs) * ChartHeight;
-            pts.Add(new Point(x, y));
+            var s = arr[i];
+            if (!s.Ok) continue;
+            sum += s.Rtt;
+            if (s.Rtt > max) max = s.Rtt;
+            n++;
         }
-        return pts;
+        _avgMs = n > 0 ? sum / n : null;
+        _maxMs = n > 0 ? max : null;
+        RefreshStatProjections();
+    }
+
+    // Projects current/avg/max into the bound display properties, honoring the global cycler.
+    private void RefreshStatProjections()
+    {
+        MaxValue = _maxMs is double mx ? mx.ToString("F0") : "—";
+        var avgStr = _avgMs is double av ? av.ToString("F0") : "—";
+        var nowStr = !_hasResult
+            ? "—"
+            : (LastWasSuccess && LastRttMs is double r ? r.ToString("F0") : "T/O");
+
+        if (ShowAvgAsPrimary)
+        {
+            PrimaryValue = _avgMs is double a ? $"{a:F0} MS" : "—— MS";
+            PrimaryBrush = AccentBrush;
+            PrimaryIsAverage = true;
+            SecondaryLabel = "NOW";
+            SecondaryValue = nowStr;
+        }
+        else
+        {
+            PrimaryValue = RttDisplay;
+            PrimaryBrush = (_hasResult && !LastWasSuccess) ? FailBrush : AccentBrush;
+            PrimaryIsAverage = false;
+            SecondaryLabel = "AVG";
+            SecondaryValue = avgStr;
+        }
+    }
+
+    // Success-only latency line in logical 0..ChartWidth x 0..ChartHeight space, broken into
+    // one figure per contiguous run of successes so timeouts leave a true gap. Y auto-scales
+    // to the min/max of successful pings in the window — small values stay visible. The
+    // geometry is rendered by a Viewbox+Canvas in XAML, so no explicit stretch anchoring is
+    // needed here. Timeouts contribute nothing to the line (they are drawn as "x" markers).
+    private Geometry BuildLatencyGeometry()
+    {
+        var arr = _samples.ToArray();
+        var start = Math.Max(0, arr.Length - Window);
+        if (arr.Length - start == 0) return Geometry.Empty;
+
+        var pts = new List<(int slot, double rtt)>();
+        double min = double.MaxValue, max = double.MinValue;
+        for (int i = start; i < arr.Length; i++)
+        {
+            var s = arr[i];
+            if (!s.Ok) continue;
+            pts.Add((i - start, s.Rtt));
+            if (s.Rtt < min) min = s.Rtt;
+            if (s.Rtt > max) max = s.Rtt;
+        }
+        if (pts.Count == 0) return Geometry.Empty;
+
+        double range = max - min;
+        double XFor(int slot) => (slot + 0.5) / Window * ChartWidth;
+        double YFor(double rtt) => range < 1e-6
+            ? ChartHeight / 2.0
+            : (ChartHeight - ChartPad) - ((rtt - min) / range) * (ChartHeight - 2 * ChartPad);
+
+        var geo = new StreamGeometry();
+        using (var ctx = geo.Open())
+        {
+            int idx = 0;
+            while (idx < pts.Count)
+            {
+                int runStart = idx;
+                while (idx + 1 < pts.Count && pts[idx + 1].slot == pts[idx].slot + 1) idx++;
+
+                var first = pts[runStart];
+                ctx.BeginFigure(new Point(XFor(first.slot), YFor(first.rtt)), false, false);
+                if (idx == runStart)
+                {
+                    // Isolated success between timeouts — draw a tiny nub so it stays visible.
+                    ctx.LineTo(new Point(XFor(first.slot) + 0.6, YFor(first.rtt)), true, false);
+                }
+                else
+                {
+                    for (int k = runStart + 1; k <= idx; k++)
+                        ctx.LineTo(new Point(XFor(pts[k].slot), YFor(pts[k].rtt)), true, false);
+                }
+                idx++;
+            }
+        }
+        geo.Freeze();
+        return geo;
     }
 
     private static Brush MakeBrush(byte r, byte g, byte b)

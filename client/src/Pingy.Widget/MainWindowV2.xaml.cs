@@ -230,6 +230,8 @@ public partial class MainWindowV2 : Window
         Vm.Zoom = 1.0;
     }
 
+    private void StatCycle_Click(object sender, RoutedEventArgs e) => Vm?.CycleStatDisplay();
+
     // -- Add / Edit target ----------------------------------------------
 
     private async void AddTargetButton_Click(object sender, RoutedEventArgs e)
@@ -238,7 +240,7 @@ public partial class MainWindowV2 : Window
         var dlg = new AddTargetWindow { Owner = this };
         var ok = dlg.ShowDialog();
         if (ok != true) return;
-        await Vm.AddTargetAsync(dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts());
+        await Vm.AddTargetAsync(dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts(), dlg.OwnerText);
     }
 
     private async void TargetRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -256,7 +258,7 @@ public partial class MainWindowV2 : Window
         if (dlg.DeleteRequested)
             await Vm.DeleteTargetAsync(row.Target.Id);
         else
-            await Vm.UpdateTargetAsync(row.Target.Id, dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts());
+            await Vm.UpdateTargetAsync(row.Target.Id, dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts(), dlg.OwnerText);
     }
 
     private static bool IsClickInteractive(DependencyObject src)

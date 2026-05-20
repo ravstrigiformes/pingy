@@ -215,11 +215,27 @@
                 <Button Grid.Column="1" Content="✕" Width="28" Height="22" Background="Transparent" BorderBrush="{StaticResource DimBrush}" BorderThickness="1" Foreground="{StaticResource DimBrush}" Cursor="Hand" Click="CancelButton_Click"/>
             </Grid>
 
-            <TextBlock Grid.Row="1" Style="{StaticResource LabelStyle}" Text="LABEL"/>
-            <TextBox Grid.Row="2" x:Name="LabelBox" TabIndex="0"/>
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="2*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Style="{StaticResource LabelStyle}" Text="LABEL"/>
+                <TextBlock Grid.Column="2" Style="{StaticResource LabelStyle}" Text="OWNER / RESPONSIBLE"/>
+            </Grid>
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="2*"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" x:Name="LabelBox" TabIndex="0"/>
+                <TextBox Grid.Column="2" x:Name="OwnerBox" TabIndex="1"/>
+            </Grid>
 
             <TextBlock Grid.Row="3" Style="{StaticResource LabelStyle}" Text="HOST / IP / URL"/>
-            <TextBox Grid.Row="4" x:Name="HostBox" TabIndex="1"/>
+            <TextBox Grid.Row="4" x:Name="HostBox" TabIndex="2"/>
 
             <TextBlock Grid.Row="5" Style="{StaticResource LabelStyle}" Text="TAGS"/>
             <ItemsControl Grid.Row="6" x:Name="TagChips" ItemsSource="{Binding}">
@@ -239,15 +255,15 @@
 
             <StackPanel Grid.Row="7" Orientation="Vertical" Margin="0,12,0,0">
                 <TextBlock Style="{StaticResource LabelStyle}" Text="CUSTOM TAGS (comma-separated)" Margin="0,0,0,4"/>
-                <TextBox x:Name="CustomTagsBox" TabIndex="2"/>
+                <TextBox x:Name="CustomTagsBox" TabIndex="3"/>
 
                 <TextBlock Style="{StaticResource LabelStyle}" Text="PORTS  e.g.  80, 443, 5173:vite, 8080:api" Margin="0,12,0,4"/>
-                <TextBox x:Name="PortsBox" TabIndex="3"/>
+                <TextBox x:Name="PortsBox" TabIndex="4"/>
 
                 <TextBlock Style="{StaticResource LabelStyle}"
                            Text="PORT CHECKS  (one per line:  &lt;port&gt; &lt;http|https&gt; &lt;path&gt; [status=NNN] [insecure])"
                            Margin="0,12,0,4"/>
-                <TextBox x:Name="ChecksBox" TabIndex="4"
+                <TextBox x:Name="ChecksBox" TabIndex="5"
                          AcceptsReturn="True"
                          AcceptsTab="False"
                          Height="68"
@@ -269,10 +285,10 @@
                         Visibility="Collapsed"
                         Foreground="{StaticResource MagentaBrush}"
                         BorderBrush="{StaticResource MagentaBrush}"
-                        TabIndex="7"/>
+                        TabIndex="8"/>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="CANCEL" Style="{StaticResource ActionButton}" Click="CancelButton_Click" TabIndex="6"/>
-                    <Button x:Name="SaveButton" Content="SAVE" Style="{StaticResource PrimaryButton}" Click="SaveButton_Click" TabIndex="5" IsDefault="True"/>
+                    <Button Content="CANCEL" Style="{StaticResource ActionButton}" Click="CancelButton_Click" TabIndex="7"/>
+                    <Button x:Name="SaveButton" Content="SAVE" Style="{StaticResource PrimaryButton}" Click="SaveButton_Click" TabIndex="6" IsDefault="True"/>
                 </StackPanel>
             </Grid>
         </Grid>
