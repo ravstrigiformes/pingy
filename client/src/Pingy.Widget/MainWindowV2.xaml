@@ -694,10 +694,10 @@
                                                                IsHitTestVisible="False"/>
                                                 </Border>
 
-                                                <!-- Diamond — uses AccentBrush (worst-in-window) -->
+                                                <!-- Diamond — OverallBrush: device health + port health rollup -->
                                                 <Polygon Grid.Column="1"
                                                          Points="6,0 12,6 6,12 0,6"
-                                                         Fill="{Binding AccentBrush}"
+                                                         Fill="{Binding OverallBrush}"
                                                          Width="12" Height="12"
                                                          VerticalAlignment="Center"
                                                          Margin="0,0,8,0"/>
@@ -1009,7 +1009,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <Ellipse Grid.Column="0" Width="6" Height="6" Fill="{Binding AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            <Ellipse Grid.Column="0" Width="6" Height="6" Fill="{Binding OverallBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                             <TextBlock Grid.Column="1"
                                                        FontSize="10"
                                                        FontFamily="Cascadia Mono, Consolas"

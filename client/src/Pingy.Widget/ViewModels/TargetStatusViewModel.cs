@@ -120,8 +120,13 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     [ObservableProperty] private string _rttDisplay = "—— MS";
     // Live status (UP/DOWN/INIT) — cyan/magenta/yellow. Used for the small status badge text only.
     [ObservableProperty] private Brush _stateBrush = UnknownBrush;
-    // Row accent: worst-tier brush computed from the displayed sample window.
+    // Device accent: ICMP-only health (latency tiers + the timeout rule). Drives the top bar,
+    // the latency number, and the chart line. Port health is deliberately excluded — an
+    // unreachable port must not paint the whole card red when the device itself is responding.
     [ObservableProperty] private Brush _accentBrush = UnknownBrush;
+    // Overall rollup: device accent merged with port health (worst wins). Drives the diamond
+    // (full mode) and circle (mini mode) only — the at-a-glance "is anything wrong here" dot.
+    [ObservableProperty] private Brush _overallBrush = UnknownBrush;
     [ObservableProperty] private DateTimeOffset _lastUpdate = DateTimeOffset.MinValue;
 
     // Chart: success-only latency line (true gaps at timeouts) + per-slot timeout flags.
@@ -259,7 +264,15 @@ public sealed partial class TargetStatusViewModel : ObservableObject
             TimeoutFlags.Add(!arr[i].Ok);
     }
 
-    // Accent color rule (evaluated over the most-recent Window samples):
+    // Color rule. Two signals are produced from the same window:
+    //
+    //   AccentBrush  — DEVICE health only (ICMP): latency tiers + the timeout rule below.
+    //                  Drives the top bar, latency number, and chart line. Ports excluded —
+    //                  an unreachable port never reddens the device-level visuals.
+    //   OverallBrush — AccentBrush merged with port health (worst wins). Drives the diamond
+    //                  and mini circle — the at-a-glance rollup.
+    //
+    // Timeout rule (over the most-recent Window samples):
     //   run of >= RtoRedRun consecutive timeouts, OR >= RtoRedTotal total timeouts -> red
     //   any timeout(s) present below those thresholds                              -> amber (>= Fair)
     //   no timeouts                                                                -> worst latency tier
@@ -268,6 +281,7 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         if (_samples.Count == 0)
         {
             AccentBrush = UnknownBrush;
+            OverallBrush = UnknownBrush;
             return;
         }
 
@@ -294,26 +308,29 @@ public sealed partial class TargetStatusViewModel : ObservableObject
             }
         }
 
-        Tier accent;
+        Tier device;
         if (longestRun >= RtoRedRun || totalTimeouts >= RtoRedTotal)
-            accent = Tier.Fail;
+            device = Tier.Fail;
         else if (totalTimeouts > 0)
-            accent = (sawSuccess && worstLatency > Tier.Fair) ? worstLatency : Tier.Fair;
+            device = (sawSuccess && worstLatency > Tier.Fair) ? worstLatency : Tier.Fair;
         else
-            accent = sawSuccess ? worstLatency : Tier.Unknown;
+            device = sawSuccess ? worstLatency : Tier.Unknown;
 
-        // Port health rolls into the card accent. A DOWN port (TCP refused/timeout) is a
-        // hard failure regardless of ICMP. A DEGRADED port (TCP up, L7 check failing) only
-        // bumps the card to Poor/amber when ICMP itself is up.
+        AccentBrush = BrushFor(device);
+
+        // Overall rollup — port health folds in here, and ONLY here. A DOWN port (TCP
+        // refused/timeout) is a hard failure; a DEGRADED port (TCP up, L7 check failing)
+        // bumps to Poor when the device itself is reachable.
+        Tier overall = device;
         bool anyPortDown = Ports.Any(p => p.HasResult && p.LastHealth == PortHealth.Down);
         bool anyPortDegraded = Ports.Any(p => p.HasResult && p.LastHealth == PortHealth.Degraded);
 
         if (anyPortDown)
-            accent = Tier.Fail;
-        else if (anyPortDegraded && LastWasSuccess && accent < Tier.Poor)
-            accent = Tier.Poor;
+            overall = Tier.Fail;
+        else if (anyPortDegraded && LastWasSuccess && overall < Tier.Poor)
+            overall = Tier.Poor;
 
-        AccentBrush = BrushFor(accent);
+        OverallBrush = BrushFor(overall);
     }
 
     // Max + average over the successful pings in the window. Timeouts are excluded entirely
