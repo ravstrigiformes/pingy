@@ -318,7 +318,8 @@
                 <Button Grid.Column="1" Content="✕" Width="30" Height="26" Background="Transparent"
                         BorderBrush="{StaticResource DimBrush}" BorderThickness="1"
                         Foreground="{StaticResource DimBrush}" Cursor="Hand"
-                        IsTabStop="False" Click="CancelButton_Click"/>
+                        IsTabStop="False" Click="CancelButton_Click"
+                        ToolTip="Close without saving"/>
             </Grid>
 
             <!-- ===== SCROLLABLE SECTIONS ===== -->
@@ -458,10 +459,11 @@
                         Style="{StaticResource DangerButton}"
                         Click="DeleteButton_Click"
                         Visibility="Collapsed"
-                        TabIndex="8"/>
+                        TabIndex="8"
+                        ToolTip="Remove this target permanently"/>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="CANCEL" Style="{StaticResource ActionButton}" Click="CancelButton_Click" TabIndex="7"/>
-                    <Button x:Name="SaveButton" Content="SAVE" Style="{StaticResource PrimaryButton}" Click="SaveButton_Click" TabIndex="6" IsDefault="True"/>
+                    <Button Content="CANCEL" Style="{StaticResource ActionButton}" Click="CancelButton_Click" TabIndex="7" ToolTip="Discard changes and close"/>
+                    <Button x:Name="SaveButton" Content="SAVE" Style="{StaticResource PrimaryButton}" Click="SaveButton_Click" TabIndex="6" IsDefault="True" ToolTip="Save this target (Enter)"/>
                 </StackPanel>
             </Grid>
         </Grid>

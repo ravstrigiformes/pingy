@@ -141,7 +141,8 @@
                 </StackPanel>
                 <Button Grid.Column="1" Content="✕" Width="26" Height="20"
                         Background="Transparent" BorderBrush="{StaticResource DimBrush}" BorderThickness="1"
-                        Foreground="{StaticResource DimBrush}" Cursor="Hand" Click="Cancel_Click"/>
+                        Foreground="{StaticResource DimBrush}" Cursor="Hand" Click="Cancel_Click"
+                        ToolTip="Dismiss — keep Pingy open"/>
             </Grid>
 
             <!-- Message -->

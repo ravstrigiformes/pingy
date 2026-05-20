@@ -525,16 +525,16 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <Button Grid.Column="0" Style="{StaticResource AccentButton}" Content="+ ADD TARGET" Click="AddTargetButton_Click" Margin="0,0,12,0"/>
+                    <Button Grid.Column="0" Style="{StaticResource AccentButton}" Content="+ ADD TARGET" Click="AddTargetButton_Click" Margin="0,0,12,0" ToolTip="Add a host or device to monitor"/>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource LabelText}" Text="INTERVAL " VerticalAlignment="Center"/>
-                        <Button Style="{StaticResource ChromeButton}" Content="−" Click="IntervalDecrease_Click" MinWidth="22" Margin="4,0,2,0"/>
+                        <Button Style="{StaticResource ChromeButton}" Content="−" Click="IntervalDecrease_Click" MinWidth="22" Margin="4,0,2,0" ToolTip="Probe less often (longer interval)"/>
                         <TextBox x:Name="IntervalBox" Style="{StaticResource StepperBox}"
                                  Text="{Binding IntervalSeconds, UpdateSourceTrigger=LostFocus, Mode=TwoWay, FallbackValue=5}"
                                  PreviewTextInput="IntervalBox_PreviewTextInput"
                                  KeyDown="IntervalBox_KeyDown"/>
-                        <Button Style="{StaticResource ChromeButton}" Content="+" Click="IntervalIncrease_Click" MinWidth="22" Margin="2,0,4,0"/>
+                        <Button Style="{StaticResource ChromeButton}" Content="+" Click="IntervalIncrease_Click" MinWidth="22" Margin="2,0,4,0" ToolTip="Probe more often (shorter interval)"/>
                         <TextBlock Style="{StaticResource LabelText}" Text="s [1–300]" VerticalAlignment="Center"/>
                     </StackPanel>
 
@@ -937,7 +937,39 @@
                                 <TextBlock Style="{StaticResource LabelText}" Text="| LINK:"/>
                                 <TextBlock FontSize="9" Foreground="{StaticResource YellowBrush}" Text=" LOCAL"/>
                             </StackPanel>
-                            <TextBlock Grid.Column="2" FontSize="9" Foreground="{StaticResource TextDimBrush}" Text="{Binding StatusLine}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right"/>
+                            <!-- Transient status / feedback line — flows right, trims when long. -->
+                            <TextBlock Grid.Column="1" FontSize="9" Foreground="{StaticResource TextDimBrush}"
+                                       Text="{Binding StatusLine}" TextTrimming="CharacterEllipsis"
+                                       HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       Margin="12,0,10,0"/>
+
+                            <!-- THIS DEVICE: machine name + LAN IP + gateway, anchored bottom-right.
+                                 Click anywhere on it to copy the details to the clipboard. -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+                                        Background="Transparent" Cursor="Hand"
+                                        ToolTip="{Binding SelfIdentityTooltip}"
+                                        MouseLeftButtonUp="SelfIdentity_Click">
+                                <Border Width="1" Background="#3300F0FF" Margin="0,0,8,0"/>
+                                <TextBlock Style="{StaticResource LabelText}" Text="THIS PC " VerticalAlignment="Center"/>
+                                <TextBlock FontSize="9" FontFamily="Cascadia Mono, Consolas" FontWeight="Bold"
+                                           Foreground="{StaticResource TextBrightBrush}"
+                                           Text="{Binding DeviceLabel}" VerticalAlignment="Center"/>
+                                <TextBlock FontSize="9" Foreground="{StaticResource TextDimBrush}"
+                                           Text="  ·  " VerticalAlignment="Center"/>
+                                <TextBlock FontSize="9" FontFamily="Cascadia Mono, Consolas" FontWeight="Bold"
+                                           Foreground="{StaticResource CyanBrush}"
+                                           Text="{Binding IpLabel}" VerticalAlignment="Center"/>
+                                <!-- Gateway — only shown when one is configured. -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                            Visibility="{Binding HasGateway, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Style="{StaticResource LabelText}" Text="  GW " VerticalAlignment="Center"/>
+                                    <TextBlock FontSize="9" FontFamily="Cascadia Mono, Consolas"
+                                               Foreground="{StaticResource TextDimBrush}"
+                                               Text="{Binding GatewayLabel}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBlock Text="⧉" FontSize="10" Foreground="{StaticResource TextDimBrush}"
+                                           VerticalAlignment="Center" Margin="6,0,0,0"/>
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </Grid>
@@ -954,6 +986,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0" Background="#221E2A4D" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Height="22">
@@ -979,7 +1012,7 @@
                         <!-- Snap to right edge, full height, keep mini width -->
                         <Button Grid.Column="3" Style="{StaticResource ChromeButton}" Content="⇥" Click="MiniSnapRight_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="11" ToolTip="Snap to right edge (full height)"/>
                         <Button Grid.Column="4" Style="{StaticResource ChromeButton}" Content="▣" Click="ModeToggle_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="10" ToolTip="Restore to full"/>
-                        <Button Grid.Column="5" Style="{StaticResource CloseButton}" Content="✕" Click="CloseButton_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="9"/>
+                        <Button Grid.Column="5" Style="{StaticResource CloseButton}" Content="✕" Click="CloseButton_Click" Width="22" Height="18" Margin="0,0,2,0" Padding="0" FontSize="9" ToolTip="Close"/>
                     </Grid>
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" Padding="0,2,0,0">
@@ -1044,6 +1077,21 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+
+                    <!-- THIS DEVICE: machine name + LAN IP footer (lower-right, trims to fit).
+                         Click to copy the full details to the clipboard. -->
+                    <Border Grid.Row="2" Background="#221E2A4D" BorderBrush="#1F00F0FF"
+                            BorderThickness="0,1,0,0" Padding="6,2" Cursor="Hand"
+                            ToolTip="{Binding SelfIdentityTooltip}"
+                            MouseLeftButtonUp="SelfIdentity_Click">
+                        <TextBlock FontSize="8" FontFamily="Cascadia Mono, Consolas"
+                                   Foreground="{StaticResource TextDimBrush}"
+                                   TextAlignment="Right" TextTrimming="CharacterEllipsis">
+                            <Run Text="{Binding DeviceLabel, Mode=OneWay}" Foreground="{StaticResource TextBrightBrush}"/>
+                            <Run Text=" · " Foreground="{StaticResource TextDimBrush}"/>
+                            <Run Text="{Binding IpLabel, Mode=OneWay}" Foreground="{StaticResource CyanBrush}"/>
+                        </TextBlock>
+                    </Border>
                 </Grid>
             </Border>
     </Grid>

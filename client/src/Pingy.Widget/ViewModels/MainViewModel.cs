@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -38,6 +39,38 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _isTopmost = true;
     [ObservableProperty] private Brush _healthBrush = HealthYellowBrush;
     [ObservableProperty] private string _healthLabel = "INIT";
+
+    // --- This device (self) identity ------------------------------------
+    // Surfaced in the status bar so the user can read off their own machine
+    // name, LAN IP and gateway at a glance — the first things IT asks for.
+    // Re-resolved on any network change so a Wi-Fi roam / dock can't make it lie.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeviceLabel))]
+    [NotifyPropertyChangedFor(nameof(IpLabel))]
+    [NotifyPropertyChangedFor(nameof(GatewayLabel))]
+    [NotifyPropertyChangedFor(nameof(HasGateway))]
+    [NotifyPropertyChangedFor(nameof(SelfIdentityTooltip))]
+    [NotifyPropertyChangedFor(nameof(SelfIdentityCopyText))]
+    private LocalHostInfo _self = LocalHost.Describe();
+
+    public string DeviceLabel => Self.DeviceName;
+    public string IpLabel => Self.IPv4 ?? "no IPv4";
+    public string GatewayLabel => Self.Gateway ?? "—";
+    public bool HasGateway => Self.Gateway is not null;
+
+    // Multi-line hover detail — the inline readout stays terse; this carries the rest.
+    public string SelfIdentityTooltip =>
+        "THIS DEVICE  (click to copy)\n" +
+        $"Name      {Self.DeviceName}\n" +
+        $"Address   {Self.Cidr ?? "no IPv4"}\n" +
+        $"Gateway   {Self.Gateway ?? "—"}" +
+        (Self.AdapterName is { Length: > 0 } adapter ? $"\nAdapter   {adapter}" : "");
+
+    // One-liner formatted for pasting into a support ticket / chat to IT.
+    public string SelfIdentityCopyText =>
+        $"Device: {Self.DeviceName} | IP: {Self.Cidr ?? "n/a"} | Gateway: {Self.Gateway ?? "n/a"}";
+
+    private void RefreshSelf() => Self = LocalHost.Describe();
 
     // Manual zoom factor applied via LayoutTransform on the content root.
     // Decoupled from window size — resize and zoom are now independent.
@@ -117,6 +150,10 @@ public sealed partial class MainViewModel : ObservableObject
         TargetsView.Filter = TargetFilter;
 
         FilterChips.CollectionChanged += (_, _) => RefreshFilterSubscriptions();
+
+        // The LAN attachment can change under the user (Wi-Fi roam, dock, VPN) — keep it honest.
+        NetworkChange.NetworkAddressChanged += (_, _) =>
+            Application.Current?.Dispatcher.Invoke(RefreshSelf);
     }
 
     partial void OnIntervalSecondsChanged(int value)

@@ -4,6 +4,28 @@
              xmlns:local="clr-namespace:Pingy.Widget"
              StartupUri="MainWindowV2.xaml">
     <Application.Resources>
-         
+        <!-- Cyber-themed tooltip — applies app-wide so every hover hint matches the UI
+             instead of flashing a stock white box. Colours are inlined (not StaticResource)
+             so this works in every window without a per-window palette. -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Foreground" Value="#FFD9F4FF"/>
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Courier New"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="#FF080B16" BorderBrush="#FF00F0FF"
+                                BorderThickness="1" Padding="8,5">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#FF00F0FF" BlurRadius="8"
+                                                  ShadowDepth="0" Opacity="0.4"/>
+                            </Border.Effect>
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Application.Resources>
 </Application>

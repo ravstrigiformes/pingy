@@ -237,6 +237,24 @@ public partial class MainWindowV2 : Window
 
     private void StatCycle_Click(object sender, RoutedEventArgs e) => Vm?.CycleStatDisplay();
 
+    // -- This-device readout: click to copy ------------------------------
+
+    private void SelfIdentity_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (Vm is null) return;
+        try
+        {
+            Clipboard.SetText(Vm.SelfIdentityCopyText);
+            Vm.StatusLine = "✓ Copied this device's details to the clipboard.";
+        }
+        catch (Exception ex)
+        {
+            // The clipboard can be momentarily locked by another process — never crash over it.
+            CrashLogger.Log("clipboard.copy", ex);
+            Vm.StatusLine = "× Couldn't access the clipboard — try again.";
+        }
+    }
+
     // -- Add / Edit target ----------------------------------------------
 
     private void AddTargetButton_Click(object sender, RoutedEventArgs e)
