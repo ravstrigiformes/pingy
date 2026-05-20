@@ -190,21 +190,47 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         var vm = Ports.FirstOrDefault(p => p.Number == result.Port);
         if (vm is null) return;
         vm.Update(result);
+        RefreshState();      // a port coming up/down can flip the badge (DOWN <-> NO PING)
         RecomputeAccent();
     }
+
+    // Status badge + live brush. A ping failure is only a red "DOWN" when nothing else
+    // answers — if a configured port is reachable the device is alive (ICMP is just
+    // blocked/filtered), so it reads "NO PING" in amber instead.
+    private void RefreshState()
+    {
+        if (!_hasResult) return;
+        if (LastWasSuccess)
+        {
+            StateBadge = "UP";
+            StateBrush = LanBrush;       // cyan
+        }
+        else if (AnyPortReachable())
+        {
+            StateBadge = "NO PING";
+            StateBrush = FairBrush;      // amber
+        }
+        else
+        {
+            StateBadge = "DOWN";
+            StateBrush = FailBrush;      // magenta
+        }
+    }
+
+    // A port is proof-of-life if TCP connected — Ok or Degraded (Degraded = TCP up, only
+    // the L7 check failing). Down = TCP refused/timed out, which is not proof of anything.
+    private bool AnyPortReachable() =>
+        Ports.Any(p => p.HasResult && p.LastHealth is PortHealth.Ok or PortHealth.Degraded);
 
     public void Update(PingResult result)
     {
         State = result.Status.ToUpperInvariant();
-        StateBadge = result.Success ? "UP" : "DOWN";
         RttDisplay = result.Success ? $"{result.RttMs:F0} MS" : "TIMEOUT";
-        StateBrush = result.Success
-            ? MakeBrush(0x00, 0xF0, 0xFF)   // live cyan for UP
-            : MakeBrush(0xFF, 0x2E, 0x63);  // live magenta for DOWN
         LastUpdate = result.At;
         LastRttMs = result.RttMs;
         LastWasSuccess = result.Success;
         _hasResult = true;
+        RefreshState();
         OnPropertyChanged(nameof(RttSortKey));
         OnPropertyChanged(nameof(StatusSortKey));
 
@@ -221,20 +247,20 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     }
 
     // Tier thresholds (round-trip ms):
-    //   < 10  -> LAN (intranet-grade)
-    //   < 100 -> GOOD (healthy internet)
-    //   < 250 -> FAIR (usable but noticeable)
-    //   < 500 -> POOR (degraded)
-    //   >=500 -> BAD
-    //   timeout -> FAIL
+    //   < 10  -> LAN  (cyan   — excellent: LAN/local, instant)
+    //   < 100 -> GOOD (green  — healthy, normal)
+    //   < 200 -> FAIR (yellow — tolerable: noticeable lag)
+    //   < 350 -> POOR (orange — warning: degraded, investigate)
+    //   >=350 -> BAD  (red    — alert: unusable)
+    //   timeout -> FAIL (red  — alert)
     private static Tier ComputeTier(PingResult r)
     {
         if (!r.Success) return Tier.Fail;
         var rtt = r.RttMs ?? 0;
         if (rtt < 10) return Tier.Lan;
         if (rtt < 100) return Tier.Good;
-        if (rtt < 250) return Tier.Fair;
-        if (rtt < 500) return Tier.Poor;
+        if (rtt < 200) return Tier.Fair;
+        if (rtt < 350) return Tier.Poor;
         return Tier.Bad;
     }
 
@@ -316,6 +342,12 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         else
             device = sawSuccess ? worstLatency : Tier.Unknown;
 
+        // Proof of life: if ICMP is failing outright but a configured port is reachable,
+        // the device IS alive — ICMP is just blocked/filtered. Cap the penalty at amber so
+        // the top bar, latency number, and chart don't scream red for a healthy box.
+        if (device == Tier.Fail && AnyPortReachable())
+            device = Tier.Fair;
+
         AccentBrush = BrushFor(device);
 
         // Overall rollup — port health folds in here, and ONLY here. A DOWN port (TCP
@@ -374,7 +406,7 @@ public sealed partial class TargetStatusViewModel : ObservableObject
         else
         {
             PrimaryValue = RttDisplay;
-            PrimaryBrush = (_hasResult && !LastWasSuccess) ? FailBrush : AccentBrush;
+            PrimaryBrush = AccentBrush;
             PrimaryIsAverage = false;
             SecondaryLabel = "AVG";
             SecondaryValue = avgStr;

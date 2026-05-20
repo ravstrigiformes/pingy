@@ -460,21 +460,6 @@
             </Canvas.Background>
         </Canvas>
 
-        <!-- Scanline (animations + not interacting). Paused during window drag/resize. -->
-        <Canvas x:Name="ScanlineCanvas" IsHitTestVisible="False" ClipToBounds="True" Margin="3,3,3,3"
-                Visibility="{Binding ScanlineActive, Converter={StaticResource BoolToVis}}">
-            <Rectangle x:Name="Scanline" Height="2" Opacity="0.45">
-                <Rectangle.Fill>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                        <GradientStop Color="#0000F0FF" Offset="0"/>
-                        <GradientStop Color="#FF00F0FF" Offset="0.5"/>
-                        <GradientStop Color="#0000F0FF" Offset="1"/>
-                    </LinearGradientBrush>
-                </Rectangle.Fill>
-                <Rectangle.RenderTransform><TranslateTransform x:Name="ScanlineXf" Y="-4"/></Rectangle.RenderTransform>
-            </Rectangle>
-        </Canvas>
-
         <!-- CONTENT (scaled by Zoom via LayoutTransform on inner grid) -->
         <Grid Margin="14,12,14,10">
             <Grid.LayoutTransform>
@@ -513,7 +498,7 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                         <ToggleButton Style="{StaticResource IconToggle}"
                                       IsChecked="{Binding AnimationsEnabled, Mode=TwoWay}"
-                                      ToolTip="Animations (sparkline + scanline). Off = static dots.">
+                                      ToolTip="Sparkline chart. Off = static dot strip.">
                             <TextBlock Text="∿" FontSize="14" FontWeight="Bold"/>
                         </ToggleButton>
                         <ToggleButton Style="{StaticResource IconToggle}"

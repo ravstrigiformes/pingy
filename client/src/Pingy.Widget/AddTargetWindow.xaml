@@ -3,12 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Pingy.Widget.ViewModels"
         Title="ADD TARGET"
-        Height="620" Width="520"
+        Width="560" Height="660"
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize"
         Background="Transparent"
         WindowStartupLocation="CenterOwner"
+        Topmost="True"
         TextOptions.TextFormattingMode="Display">
 
     <WindowChrome.WindowChrome>
@@ -25,31 +26,63 @@
         <SolidColorBrush x:Key="CyanBrush" Color="{StaticResource Cyan}"/>
         <SolidColorBrush x:Key="MagentaBrush" Color="{StaticResource Magenta}"/>
         <SolidColorBrush x:Key="DimBrush" Color="#FF5C6F94"/>
+        <SolidColorBrush x:Key="HintBrush" Color="#FF8C9EBF"/>
+        <SolidColorBrush x:Key="LabelBrush" Color="#FFB6C8E4"/>
         <SolidColorBrush x:Key="BrightBrush" Color="#FFD9F4FF"/>
         <SolidColorBrush x:Key="VoidBrush" Color="#FF050810"/>
+        <SolidColorBrush x:Key="CardBrush" Color="#FF0B1120"/>
 
         <Style TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
             <Setter Property="Foreground" Value="{StaticResource BrightBrush}"/>
         </Style>
 
-        <Style x:Key="LabelStyle" TargetType="TextBlock">
+        <!-- Field label — larger + brighter so it's easy to read. -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
-            <Setter Property="FontSize" Value="10"/>
-            <Setter Property="Foreground" Value="{StaticResource DimBrush}"/>
-            <Setter Property="Margin" Value="0,8,0,4"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource LabelBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+
+        <!-- Secondary helper text under a field. -->
+        <Style x:Key="HintText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource HintBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
+
+        <!-- Section heading. -->
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Section container card. -->
+        <Style x:Key="SectionCard" TargetType="Border">
+            <Setter Property="BorderBrush" Value="#3A00F0FF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{StaticResource CardBrush}"/>
+            <Setter Property="Padding" Value="16,12,16,16"/>
+            <Setter Property="Margin" Value="0,0,0,14"/>
         </Style>
 
         <Style TargetType="TextBox">
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Foreground" Value="{StaticResource BrightBrush}"/>
             <Setter Property="CaretBrush" Value="{StaticResource CyanBrush}"/>
             <Setter Property="SelectionBrush" Value="{StaticResource CyanBrush}"/>
             <Setter Property="Background" Value="#220B1326"/>
             <Setter Property="BorderBrush" Value="#5500F0FF"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="Padding" Value="6"/>
+            <Setter Property="Padding" Value="8"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
@@ -59,7 +92,7 @@
                                 BorderThickness="{TemplateBinding BorderThickness}">
                             <ScrollViewer x:Name="PART_ContentHost"
                                           Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="Center"/>
+                                          VerticalAlignment="Stretch"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsKeyboardFocused" Value="True">
@@ -74,10 +107,10 @@
         <!-- Tag chip toggle -->
         <Style x:Key="ChipStyle" TargetType="ToggleButton">
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
-            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Margin" Value="0,4,6,0"/>
-            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="0,5,6,0"/>
+            <Setter Property="Padding" Value="11,5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
@@ -109,23 +142,65 @@
             </Setter>
         </Style>
 
-        <Style x:Key="ActionButton" TargetType="Button">
+        <!-- Quick-add port button: one click appends the port to the PORTS box. -->
+        <Style x:Key="PortQuickButton" TargetType="Button">
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Padding" Value="14,6"/>
-            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="Padding" Value="9,4"/>
+            <Setter Property="IsTabStop" Value="False"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd"
-                                BorderBrush="{StaticResource DimBrush}"
+                                BorderBrush="#5500F0FF"
+                                BorderThickness="1"
+                                Background="#1500F0FF"
+                                Padding="{TemplateBinding Padding}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="+" FontWeight="Bold" FontSize="11"
+                                           Foreground="{StaticResource CyanBrush}"
+                                           VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBlock Text="{TemplateBinding Content}"
+                                           FontFamily="Cascadia Mono, Consolas"
+                                           FontSize="{TemplateBinding FontSize}"
+                                           Foreground="{StaticResource CyanBrush}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3A00F0FF"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Generic action button (CANCEL). Foreground/BorderBrush are themeable. -->
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="18,9"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="Foreground" Value="{StaticResource DimBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DimBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="1"
                                 Background="Transparent"
                                 Padding="{TemplateBinding Padding}">
                             <TextBlock x:Name="Txt"
                                        Text="{TemplateBinding Content}"
-                                       Foreground="{StaticResource DimBrush}"
+                                       Foreground="{TemplateBinding Foreground}"
                                        FontFamily="Cascadia Mono, Consolas"
                                        FontWeight="Bold"
                                        FontSize="{TemplateBinding FontSize}"
@@ -135,6 +210,39 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
                                 <Setter TargetName="Txt" Property="Foreground" Value="{StaticResource CyanBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Destructive action (DELETE). -->
+        <Style x:Key="DangerButton" TargetType="Button">
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="18,9"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                BorderBrush="{StaticResource MagentaBrush}"
+                                BorderThickness="1"
+                                Background="Transparent"
+                                Padding="{TemplateBinding Padding}">
+                            <TextBlock x:Name="Txt"
+                                       Text="{TemplateBinding Content}"
+                                       Foreground="{StaticResource MagentaBrush}"
+                                       FontFamily="Cascadia Mono, Consolas"
+                                       FontWeight="Bold"
+                                       FontSize="{TemplateBinding FontSize}"
+                                       HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#33FF2E63"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -182,96 +290,163 @@
         <Border.Effect>
             <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="18" ShadowDepth="0" Opacity="0.6"/>
         </Border.Effect>
-        <Grid Margin="22,16,22,16">
+        <Grid Margin="20">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Background="Transparent">
+            <!-- ===== TITLE BAR ===== -->
+            <Grid Grid.Row="0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Background="Transparent" Margin="0,0,0,14">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock x:Name="ActionVerb" Text="+" FontSize="20" FontWeight="Bold" Foreground="{StaticResource MagentaBrush}" Margin="0,-4,8,0">
+                    <TextBlock x:Name="ActionVerb" Text="+" FontSize="22" FontWeight="Bold" Foreground="{StaticResource MagentaBrush}" Margin="0,-4,9,0">
                         <TextBlock.Effect>
                             <DropShadowEffect Color="{StaticResource Magenta}" BlurRadius="8" ShadowDepth="0"/>
                         </TextBlock.Effect>
                     </TextBlock>
-                    <TextBlock x:Name="TitleText" Text="NEW TARGET" FontSize="16" FontWeight="Bold" Foreground="{StaticResource CyanBrush}">
+                    <TextBlock x:Name="TitleText" Text="NEW TARGET" FontSize="17" FontWeight="Bold" Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center">
                         <TextBlock.Effect>
                             <DropShadowEffect Color="{StaticResource Cyan}" BlurRadius="8" ShadowDepth="0" Opacity="0.8"/>
                         </TextBlock.Effect>
                     </TextBlock>
                 </StackPanel>
-                <Button Grid.Column="1" Content="✕" Width="28" Height="22" Background="Transparent" BorderBrush="{StaticResource DimBrush}" BorderThickness="1" Foreground="{StaticResource DimBrush}" Cursor="Hand" Click="CancelButton_Click"/>
+                <Button Grid.Column="1" Content="✕" Width="30" Height="26" Background="Transparent"
+                        BorderBrush="{StaticResource DimBrush}" BorderThickness="1"
+                        Foreground="{StaticResource DimBrush}" Cursor="Hand"
+                        IsTabStop="False" Click="CancelButton_Click"/>
             </Grid>
 
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="3*"/>
-                    <ColumnDefinition Width="14"/>
-                    <ColumnDefinition Width="2*"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Style="{StaticResource LabelStyle}" Text="LABEL"/>
-                <TextBlock Grid.Column="2" Style="{StaticResource LabelStyle}" Text="OWNER / RESPONSIBLE"/>
-            </Grid>
-            <Grid Grid.Row="2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="3*"/>
-                    <ColumnDefinition Width="14"/>
-                    <ColumnDefinition Width="2*"/>
-                </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0" x:Name="LabelBox" TabIndex="0"/>
-                <TextBox Grid.Column="2" x:Name="OwnerBox" TabIndex="1"/>
-            </Grid>
+            <!-- ===== SCROLLABLE SECTIONS ===== -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,6,0">
+                <StackPanel>
 
-            <TextBlock Grid.Row="3" Style="{StaticResource LabelStyle}" Text="HOST / IP / URL"/>
-            <TextBox Grid.Row="4" x:Name="HostBox" TabIndex="2"/>
+                    <!-- IDENTITY -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Rectangle Width="3" Height="14" Fill="{StaticResource CyanBrush}" Margin="0,0,8,0"/>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="IDENTITY"/>
+                            </StackPanel>
+                            <Border Height="1" Background="#2600F0FF" Margin="0,8,0,12"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="3*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="2*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="LABEL"/>
+                                    <TextBox x:Name="LabelBox" TabIndex="0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="OWNER / RESPONSIBLE"/>
+                                    <TextBox x:Name="OwnerBox" TabIndex="1"/>
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Style="{StaticResource HintText}"
+                                       Text="A friendly name for this device, and who to contact when it has a problem."/>
+                        </StackPanel>
+                    </Border>
 
-            <TextBlock Grid.Row="5" Style="{StaticResource LabelStyle}" Text="TAGS"/>
-            <ItemsControl Grid.Row="6" x:Name="TagChips" ItemsSource="{Binding}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:TagChipViewModel}">
-                        <ToggleButton Content="{Binding Name}"
-                                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                      Style="{StaticResource ChipStyle}"/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                    <!-- ADDRESS -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Rectangle Width="3" Height="14" Fill="{StaticResource CyanBrush}" Margin="0,0,8,0"/>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="ADDRESS"/>
+                            </StackPanel>
+                            <Border Height="1" Background="#2600F0FF" Margin="0,8,0,12"/>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="HOST / IP / URL"/>
+                            <TextBox x:Name="HostBox" TabIndex="2"/>
+                            <TextBlock Style="{StaticResource HintText}"
+                                       Text="An IP address (192.168.1.10), a hostname (server01), or a full URL. This is what Pingy pings."/>
+                        </StackPanel>
+                    </Border>
 
-            <StackPanel Grid.Row="7" Orientation="Vertical" Margin="0,12,0,0">
-                <TextBlock Style="{StaticResource LabelStyle}" Text="CUSTOM TAGS (comma-separated)" Margin="0,0,0,4"/>
-                <TextBox x:Name="CustomTagsBox" TabIndex="3"/>
+                    <!-- TAGS -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Rectangle Width="3" Height="14" Fill="{StaticResource CyanBrush}" Margin="0,0,8,0"/>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="TAGS"/>
+                            </StackPanel>
+                            <Border Height="1" Background="#2600F0FF" Margin="0,8,0,12"/>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="PRESET TAGS"/>
+                            <ItemsControl x:Name="TagChips" ItemsSource="{Binding}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:TagChipViewModel}">
+                                        <ToggleButton Content="{Binding Name}"
+                                                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                      Style="{StaticResource ChipStyle}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="CUSTOM TAGS" Margin="0,14,0,5"/>
+                            <TextBox x:Name="CustomTagsBox" TabIndex="3"/>
+                            <TextBlock Style="{StaticResource HintText}"
+                                       Text="Comma-separated. Tags group devices and become filter chips on the main window."/>
+                        </StackPanel>
+                    </Border>
 
-                <TextBlock Style="{StaticResource LabelStyle}" Text="PORTS  e.g.  80, 443, 5173:vite, 8080:api" Margin="0,12,0,4"/>
-                <TextBox x:Name="PortsBox" TabIndex="4"/>
+                    <!-- MONITORING -->
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Rectangle Width="3" Height="14" Fill="{StaticResource CyanBrush}" Margin="0,0,8,0"/>
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="MONITORING"/>
+                            </StackPanel>
+                            <Border Height="1" Background="#2600F0FF" Margin="0,8,0,12"/>
 
-                <TextBlock Style="{StaticResource LabelStyle}"
-                           Text="PORT CHECKS  (one per line:  &lt;port&gt; &lt;http|https&gt; &lt;path&gt; [status=NNN] [insecure])"
-                           Margin="0,12,0,4"/>
-                <TextBox x:Name="ChecksBox" TabIndex="5"
-                         AcceptsReturn="True"
-                         AcceptsTab="False"
-                         Height="68"
-                         VerticalContentAlignment="Top"
-                         VerticalScrollBarVisibility="Auto"/>
-            </StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="PORTS"/>
+                            <WrapPanel Margin="0,0,0,3">
+                                <Button Style="{StaticResource PortQuickButton}" Content="80"   ToolTip="HTTP — web"            Click="PortChip_Click"/>
+                                <Button Style="{StaticResource PortQuickButton}" Content="443"  ToolTip="HTTPS — secure web"    Click="PortChip_Click"/>
+                                <Button Style="{StaticResource PortQuickButton}" Content="22"   ToolTip="SSH — remote shell"    Click="PortChip_Click"/>
+                                <Button Style="{StaticResource PortQuickButton}" Content="3389" ToolTip="RDP — Remote Desktop"  Click="PortChip_Click"/>
+                                <Button Style="{StaticResource PortQuickButton}" Content="8080" ToolTip="HTTP (alternate)"      Click="PortChip_Click"/>
+                                <Button Style="{StaticResource PortQuickButton}" Content="53"   ToolTip="DNS — name resolution" Click="PortChip_Click"/>
+                            </WrapPanel>
+                            <TextBox x:Name="PortsBox" TabIndex="4"/>
+                            <TextBlock Style="{StaticResource HintText}"
+                                       Text="TCP ports to watch — click a chip above, or type your own (e.g. 5173:vite). Checks whether the port is open."/>
 
-            <Grid Grid.Row="8" Margin="0,16,0,0">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="PORT CHECKS  (optional)" Margin="0,16,0,5"/>
+                            <Border Background="#1A001428" BorderBrush="#2600F0FF" BorderThickness="1" Padding="10" Margin="0,0,0,7">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource HintText}" Margin="0"
+                                               Text="Goes deeper than &quot;is the port open&quot; — makes a real HTTP request and checks the reply. Catches a port that's open but the app behind it is broken."/>
+                                    <TextBlock FontFamily="Cascadia Mono, Consolas" FontSize="11" Foreground="{StaticResource CyanBrush}"
+                                               TextWrapping="Wrap" Margin="0,7,0,0"
+                                               Text="One per line:  &lt;port&gt; &lt;http|https&gt; &lt;path&gt; [status=NNN] [insecure]"/>
+                                    <TextBlock FontFamily="Cascadia Mono, Consolas" FontSize="11" Foreground="{StaticResource HintBrush}"
+                                               TextWrapping="Wrap" Margin="0,3,0,0"
+                                               Text="Example:  443 https /health  →  expects HTTP 200 from https://host/health"/>
+                                </StackPanel>
+                            </Border>
+                            <TextBox x:Name="ChecksBox" TabIndex="5"
+                                     AcceptsReturn="True"
+                                     AcceptsTab="False"
+                                     Height="76"
+                                     VerticalContentAlignment="Top"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ===== ACTIONS ===== -->
+            <Grid Grid.Row="2" Margin="0,14,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
@@ -280,11 +455,9 @@
                 <Button x:Name="DeleteButton"
                         Grid.Column="0"
                         Content="DELETE"
-                        Style="{StaticResource ActionButton}"
+                        Style="{StaticResource DangerButton}"
                         Click="DeleteButton_Click"
                         Visibility="Collapsed"
-                        Foreground="{StaticResource MagentaBrush}"
-                        BorderBrush="{StaticResource MagentaBrush}"
                         TabIndex="8"/>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="CANCEL" Style="{StaticResource ActionButton}" Click="CancelButton_Click" TabIndex="7"/>

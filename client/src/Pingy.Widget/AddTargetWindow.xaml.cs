@@ -27,6 +27,13 @@ public partial class AddTargetWindow : Window
     public bool IsEditing => EditingTarget is not null;
     public bool DeleteRequested { get; private set; }
 
+    // Non-modal dialog: callers read this on the Closed event instead of a ShowDialog result.
+    public bool Committed { get; private set; }
+
+    private readonly string _initialSnapshot;
+    private bool _completed;          // a normal close path (save/cancel/delete) is underway
+    private bool _suppressDeactivate; // a child dialog of ours is up — ignore the lost focus
+
     public AddTargetWindow() : this(null) { }
 
     public AddTargetWindow(Target? editing)
@@ -59,6 +66,10 @@ public partial class AddTargetWindow : Window
             DeleteButton.Visibility = Visibility.Visible;
             SaveButton.Content = "UPDATE";
         }
+
+        // Click-outside-to-close. Snapshot taken last, once every field is populated.
+        Deactivated += OnDeactivated;
+        _initialSnapshot = Snapshot();
     }
 
     private static string FormatPorts(System.Collections.Generic.IReadOnlyList<TargetPort>? ports)
@@ -193,34 +204,108 @@ public partial class AddTargetWindow : Window
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = false;
+        _completed = true;
         Close();
     }
 
-    private void SaveButton_Click(object sender, RoutedEventArgs e)
+    private void SaveButton_Click(object sender, RoutedEventArgs e) => TrySave();
+
+    // Quick-add: append a common port to the PORTS box, skipping it if already listed.
+    private void PortChip_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button btn) return;
+        if (btn.Content is not string port || port.Length == 0) return;
+
+        var current = PortsBox.Text ?? "";
+        var alreadyListed = current
+            .Split(new[] { ',', ';', ' ', '\t', '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Split(':')[0].Trim())
+            .Any(n => n == port);
+
+        if (!alreadyListed)
+        {
+            var trimmed = current.TrimEnd().TrimEnd(',', ';').TrimEnd();
+            PortsBox.Text = trimmed.Length == 0 ? port : $"{trimmed}, {port}";
+        }
+        PortsBox.CaretIndex = (PortsBox.Text ?? string.Empty).Length;
+        PortsBox.Focus();
+    }
+
+    // Validates and, on success, commits + closes. Returns false when the input is
+    // incomplete (host is required) so the dialog can be kept open.
+    private bool TrySave()
     {
         if (string.IsNullOrWhiteSpace(HostBox.Text))
         {
             HostBox.Focus();
-            return;
+            return false;
         }
-        DialogResult = true;
+        Committed = true;
+        _completed = true;
         Close();
+        return true;
     }
 
     private void DeleteButton_Click(object sender, RoutedEventArgs e)
     {
+        _suppressDeactivate = true;
         var result = MessageBox.Show(
             this,
             $"Delete target '{(string.IsNullOrWhiteSpace(LabelBox.Text) ? HostBox.Text : LabelBox.Text)}'?",
             "Confirm delete",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
+        _suppressDeactivate = false;
 
-        if (result != MessageBoxResult.Yes) return;
+        if (result != MessageBoxResult.Yes) { Activate(); return; }
 
         DeleteRequested = true;
-        DialogResult = true;
+        Committed = true;
+        _completed = true;
         Close();
     }
+
+    // Click-outside-to-close: when the dialog loses focus, close it — but if there are
+    // unsaved edits, ask first (Save / Discard / keep editing).
+    private void OnDeactivated(object? sender, System.EventArgs e)
+    {
+        if (_completed || _suppressDeactivate) return;
+
+        if (Snapshot() == _initialSnapshot)
+        {
+            _completed = true;
+            Close();
+            return;
+        }
+
+        _suppressDeactivate = true;
+        var choice = MessageBox.Show(
+            this,
+            "You have unsaved changes. Save them?",
+            "Unsaved changes",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+        _suppressDeactivate = false;
+
+        switch (choice)
+        {
+            case MessageBoxResult.Yes:
+                if (!TrySave()) Activate();   // incomplete input — keep editing
+                break;
+            case MessageBoxResult.No:
+                _completed = true;
+                Close();
+                break;
+            default:                          // Cancel — keep editing
+                Activate();
+                break;
+        }
+    }
+
+    // Change-detection fingerprint of every editable field. U+001F (a control
+    // char) can't be typed into any text box, so field contents never collide.
+    private string Snapshot() => string.Join((char)31,
+        LabelBox.Text, OwnerBox.Text, HostBox.Text,
+        CustomTagsBox.Text, PortsBox.Text, ChecksBox.Text,
+        string.Join(",", Chips.Where(c => c.IsSelected).Select(c => c.Name)));
 }

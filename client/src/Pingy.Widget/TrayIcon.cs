@@ -20,7 +20,8 @@ internal sealed class TrayIcon : IDisposable
     private readonly Action _onExit;
     private bool _disposed;
 
-    public TrayIcon(Action onSingleClick, Action onDoubleClick, Action onExit)
+    public TrayIcon(Action onSingleClick, Action onDoubleClick, Action onExit,
+                    bool minimizeToTrayOnClose, Action<bool> onCloseToTrayChanged)
     {
         _onSingleClick = onSingleClick;
         _onDoubleClick = onDoubleClick;
@@ -36,9 +37,22 @@ internal sealed class TrayIcon : IDisposable
             _onSingleClick();
         };
 
-        var menu = new ContextMenuStrip();
+        var menu = new ContextMenuStrip { ShowItemToolTips = true };
         menu.Items.Add("Glance (mini)", null, (_, _) => _onSingleClick());
         menu.Items.Add("Open Pingy", null, (_, _) => _onDoubleClick());
+        menu.Items.Add(new ToolStripSeparator());
+
+        // Checkable: the close (X) button hides to tray when on, exits when off.
+        // A definite choice that supersedes the one-time close prompt.
+        var closeToTray = new ToolStripMenuItem("Minimize to tray on close")
+        {
+            CheckOnClick = true,
+            Checked = minimizeToTrayOnClose,
+            ToolTipText = "When on, the X button hides Pingy to the tray instead of exiting.",
+        };
+        closeToTray.CheckedChanged += (_, _) => onCloseToTrayChanged(closeToTray.Checked);
+        menu.Items.Add(closeToTray);
+
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => _onExit());
 

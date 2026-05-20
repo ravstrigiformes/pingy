@@ -9,7 +9,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using Pingy.Widget.Settings;
 using Pingy.Widget.ViewModels;
@@ -41,11 +40,12 @@ public partial class MainWindowV2 : Window
             _trayIcon = new TrayIcon(
                 onSingleClick: GlanceFromTray,
                 onDoubleClick: RestoreFromTray,
-                onExit: ExitFromTray);
+                onExit: ExitFromTray,
+                minimizeToTrayOnClose: _settings.CloseBehavior == CloseBehavior.MinimizeToTray,
+                onCloseToTrayChanged: SetCloseToTray);
 
             if (app.ViewModel is not null)
                 await app.ViewModel.StartAsync();
-            StartScanlineAnimation();
             UpdateMaxRestoreGlyph();
         };
 
@@ -66,13 +66,7 @@ public partial class MainWindowV2 : Window
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton == MouseButton.Left && e.ClickCount == 1)
-        {
-            // Aero snap (Win+arrow / drag-to-edge) needs WindowChrome's own move tracking.
-            // DragMove() works but lets us pause animations during the drag.
-            if (Vm is not null) Vm.IsInteracting = true;
-            try { DragMove(); }
-            finally { if (Vm is not null) Vm.IsInteracting = false; }
-        }
+            DragMove();
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>
@@ -176,6 +170,17 @@ public partial class MainWindowV2 : Window
         Close();
     }
 
+    // Tray-menu toggle for the close behavior — a definite choice that supersedes the
+    // one-time close prompt (CloseBehavior.Ask).
+    private void SetCloseToTray(bool minimizeToTray)
+    {
+        _settings = _settings with
+        {
+            CloseBehavior = minimizeToTray ? CloseBehavior.MinimizeToTray : CloseBehavior.Exit,
+        };
+        _settingsStore.Save(_settings);
+    }
+
     // -- Toolbar handlers ------------------------------------------------
 
     private void IntervalDecrease_Click(object sender, RoutedEventArgs e)
@@ -234,16 +239,19 @@ public partial class MainWindowV2 : Window
 
     // -- Add / Edit target ----------------------------------------------
 
-    private async void AddTargetButton_Click(object sender, RoutedEventArgs e)
+    private void AddTargetButton_Click(object sender, RoutedEventArgs e)
     {
         if (Vm is null) return;
         var dlg = new AddTargetWindow { Owner = this };
-        var ok = dlg.ShowDialog();
-        if (ok != true) return;
-        await Vm.AddTargetAsync(dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts(), dlg.OwnerText);
+        dlg.Closed += async (_, _) =>
+        {
+            if (Vm is null || !dlg.Committed) return;
+            await Vm.AddTargetAsync(dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts(), dlg.OwnerText);
+        };
+        dlg.Show();
     }
 
-    private async void TargetRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void TargetRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (Vm is null) return;
         if (sender is not FrameworkElement fe) return;
@@ -252,13 +260,15 @@ public partial class MainWindowV2 : Window
         if (e.OriginalSource is DependencyObject src && (HasDragHandleAncestor(src) || IsClickInteractive(src))) return;
 
         var dlg = new AddTargetWindow(row.Target) { Owner = this };
-        var ok = dlg.ShowDialog();
-        if (ok != true) return;
-
-        if (dlg.DeleteRequested)
-            await Vm.DeleteTargetAsync(row.Target.Id);
-        else
-            await Vm.UpdateTargetAsync(row.Target.Id, dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts(), dlg.OwnerText);
+        dlg.Closed += async (_, _) =>
+        {
+            if (Vm is null || !dlg.Committed) return;
+            if (dlg.DeleteRequested)
+                await Vm.DeleteTargetAsync(row.Target.Id);
+            else
+                await Vm.UpdateTargetAsync(row.Target.Id, dlg.LabelText, dlg.HostText, dlg.CollectTags(), dlg.CollectPorts(), dlg.OwnerText);
+        };
+        dlg.Show();
     }
 
     private static bool IsClickInteractive(DependencyObject src)
@@ -553,9 +563,6 @@ public partial class MainWindowV2 : Window
         OuterChrome.Data = BuildCornerCutGeometry(0, 0, w, h, CornerCut);
         // Inner (cyan): inset by 2px for a double-stroke look.
         InnerChrome.Data = BuildCornerCutGeometry(2, 2, w - 4, h - 4, CornerCut - 2);
-
-        // Resize scanline to the inner width as well.
-        if (Scanline is not null) Scanline.Width = w - 6;
     }
 
     private static Geometry BuildCornerCutGeometry(double x, double y, double w, double h, double cut)
@@ -580,38 +587,8 @@ public partial class MainWindowV2 : Window
         return pg;
     }
 
-    // -- Scanline animation (started in code so we can pause cleanly) ----
+    // -- Win32 hook: clamp maximize to the monitor work area ------------
 
-    private Storyboard? _scanlineStoryboard;
-
-    private void StartScanlineAnimation()
-    {
-        if (ScanlineXf is null) return;
-        var anim = new DoubleAnimation
-        {
-            From = -4,
-            To = Math.Max(200, ActualHeight),
-            Duration = new Duration(TimeSpan.FromSeconds(3.5)),
-            RepeatBehavior = RepeatBehavior.Forever,
-        };
-        // Re-target each tick (cheap), so the scanline grows with the window.
-        SizeChanged += (_, _) =>
-        {
-            if (_scanlineStoryboard is null) return;
-            anim.To = Math.Max(200, ActualHeight);
-        };
-        Storyboard.SetTarget(anim, ScanlineXf);
-        Storyboard.SetTargetProperty(anim, new PropertyPath("Y"));
-        _scanlineStoryboard = new Storyboard();
-        _scanlineStoryboard.Children.Add(anim);
-        _scanlineStoryboard.Begin();
-    }
-
-    // -- Win32 hook: pause anims during interactive move/resize ----------
-
-    private const int WM_ENTERSIZEMOVE = 0x0231;
-    private const int WM_EXITSIZEMOVE = 0x0232;
-    private const int WM_NCLBUTTONDOWN = 0x00A1;
     private const int WM_GETMINMAXINFO = 0x0024;
     private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
 
@@ -624,20 +601,12 @@ public partial class MainWindowV2 : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        switch (msg)
+        if (msg == WM_GETMINMAXINFO)
         {
-            case WM_ENTERSIZEMOVE:
-                if (Vm is not null) Vm.IsInteracting = true;
-                break;
-            case WM_EXITSIZEMOVE:
-                if (Vm is not null) Vm.IsInteracting = false;
-                break;
-            case WM_GETMINMAXINFO:
-                // WindowStyle=None + AllowsTransparency=True maximizes past the work-area edges by
-                // the resize-border thickness. Clamp the max size + position to the current monitor's
-                // work area so cards aren't clipped and column math gets the real visible width.
-                ClampMinMaxInfo(hwnd, lParam);
-                break;
+            // WindowStyle=None + AllowsTransparency=True maximizes past the work-area edges by
+            // the resize-border thickness. Clamp the max size + position to the current monitor's
+            // work area so cards aren't clipped and column math gets the real visible width.
+            ClampMinMaxInfo(hwnd, lParam);
         }
         return IntPtr.Zero;
     }

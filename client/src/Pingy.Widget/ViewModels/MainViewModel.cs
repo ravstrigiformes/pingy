@@ -45,13 +45,6 @@ public sealed partial class MainViewModel : ObservableObject
     public const double MaxZoom = 2.0;
     [ObservableProperty] private double _zoom = 1.0;
 
-    // True while the user is dragging or resizing the window. Bound to scanline +
-    // breathing-border opacity so we can pause expensive animations during move/resize.
-    [ObservableProperty] private bool _isInteracting;
-    public bool ScanlineActive => AnimationsEnabled && !IsInteracting;
-    partial void OnAnimationsEnabledChanged(bool value) => OnPropertyChanged(nameof(ScanlineActive));
-    partial void OnIsInteractingChanged(bool value) => OnPropertyChanged(nameof(ScanlineActive));
-
     public bool IsFullMode => !IsMiniMode;
     partial void OnIsMiniModeChanged(bool value) => OnPropertyChanged(nameof(IsFullMode));
 
@@ -355,7 +348,10 @@ public sealed partial class MainViewModel : ObservableObject
         {
             switch (t.StateBadge)
             {
-                case "UP": up++; break;
+                // NO PING = ICMP blocked but a port is reachable — the device is alive,
+                // so it counts as up for the at-a-glance global rollup.
+                case "UP":
+                case "NO PING": up++; break;
                 case "DOWN": down++; break;
                 default: init++; break;
             }
