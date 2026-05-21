@@ -79,11 +79,34 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
 
-        <!-- Slider: cyan-tinted, default template (proven-safe). -->
-        <Style x:Key="SettingSlider" TargetType="Slider">
-            <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+        <!-- Stepper button (− / +) — simple Border + TextBlock template. -->
+        <Style x:Key="StepButton" TargetType="Button">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="#220B1326"
+                                BorderBrush="#5500F0FF" BorderThickness="1">
+                            <TextBlock Text="{TemplateBinding Content}"
+                                       Foreground="{StaticResource CyanBrush}"
+                                       FontFamily="Cascadia Mono, Consolas"
+                                       FontSize="{TemplateBinding FontSize}" FontWeight="Bold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3300F0FF"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CyanBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Primary action (DONE) — copied from the proven AddTargetWindow style. -->
@@ -165,32 +188,36 @@
                         </StackPanel>
                         <Border Height="1" Background="#2600F0FF" Margin="0,8,0,14"/>
 
-                        <Grid Margin="0,0,0,12">
+                        <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="74"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Style="{StaticResource RowLabel}" Text="OPACITY"/>
-                            <Slider Grid.Column="1" Style="{StaticResource SettingSlider}"
-                                    Minimum="0.3" Maximum="1.0" SmallChange="0.05" LargeChange="0.1"
-                                    Value="{Binding WindowOpacity, Mode=TwoWay}" Margin="10,0,10,0"/>
-                            <TextBlock Grid.Column="2" Style="{StaticResource RowValue}"
-                                       Text="{Binding WindowOpacity, StringFormat={}{0:P0}}"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Style="{StaticResource StepButton}" Content="−"
+                                        Click="OpacityDown_Click" ToolTip="Less opaque"/>
+                                <TextBlock Style="{StaticResource RowValue}" Margin="6,0"
+                                           Text="{Binding WindowOpacity, StringFormat={}{0:P0}}"/>
+                                <Button Style="{StaticResource StepButton}" Content="+"
+                                        Click="OpacityUp_Click" ToolTip="More opaque"/>
+                            </StackPanel>
                         </Grid>
 
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="74"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Style="{StaticResource RowLabel}" Text="ZOOM"/>
-                            <Slider Grid.Column="1" Style="{StaticResource SettingSlider}"
-                                    Minimum="0.6" Maximum="2.0" SmallChange="0.1" LargeChange="0.25"
-                                    Value="{Binding Zoom, Mode=TwoWay}" Margin="10,0,10,0"/>
-                            <TextBlock Grid.Column="2" Style="{StaticResource RowValue}"
-                                       Text="{Binding Zoom, StringFormat={}{0:P0}}"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Style="{StaticResource StepButton}" Content="−"
+                                        Click="ZoomDown_Click" ToolTip="Smaller"/>
+                                <TextBlock Style="{StaticResource RowValue}" Margin="6,0"
+                                           Text="{Binding Zoom, StringFormat={}{0:P0}}"/>
+                                <Button Style="{StaticResource StepButton}" Content="+"
+                                        Click="ZoomUp_Click" ToolTip="Larger"/>
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 </Border>
