@@ -79,6 +79,12 @@ public sealed partial class MainViewModel : ObservableObject
     public const double MaxZoom = 2.0;
     [ObservableProperty] private double _zoom = 1.0;
 
+    // Window translucency. Bound one-way to Window.Opacity; edited from the Settings
+    // panel and persisted via AppSettings.
+    public const double MinOpacity = 0.3;
+    public const double MaxOpacity = 1.0;
+    [ObservableProperty] private double _windowOpacity = 0.95;
+
     public bool IsFullMode => !IsMiniMode;
     partial void OnIsMiniModeChanged(bool value) => OnPropertyChanged(nameof(IsFullMode));
 

@@ -31,7 +31,8 @@ internal sealed class SettingsStore
         {
             if (!File.Exists(FilePath)) return new AppSettings();
             var json = File.ReadAllText(FilePath);
-            return JsonSerializer.Deserialize<AppSettings>(json, Options) ?? new AppSettings();
+            var loaded = JsonSerializer.Deserialize<AppSettings>(json, Options) ?? new AppSettings();
+            return Sanitize(loaded);
         }
         catch (System.Exception ex)
         {
@@ -39,6 +40,15 @@ internal sealed class SettingsStore
             return new AppSettings();
         }
     }
+
+    // Clamp numeric prefs into their valid UI ranges. An out-of-range value — including
+    // 0, which is what a settings file written before these fields existed deserialises
+    // to — falls back to the default rather than producing an invisible window.
+    private static AppSettings Sanitize(AppSettings s) => s with
+    {
+        Opacity = s.Opacity is >= 0.3 and <= 1.0 ? s.Opacity : 0.95,
+        Zoom = s.Zoom is >= 0.6 and <= 2.0 ? s.Zoom : 1.0,
+    };
 
     public void Save(AppSettings settings)
     {

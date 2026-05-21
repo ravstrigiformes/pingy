@@ -37,6 +37,7 @@ public partial class MainWindowV2 : Window
         Loaded += async (_, _) =>
         {
             _settings = _settingsStore.Load();
+            ApplySettingsToVm(app.ViewModel);
             _trayIcon = new TrayIcon(
                 onSingleClick: GlanceFromTray,
                 onDoubleClick: RestoreFromTray,
@@ -188,6 +189,47 @@ public partial class MainWindowV2 : Window
         _settingsStore.Save(_settings);
     }
 
+    // -- Settings panel --------------------------------------------------
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dlg = new SettingsWindow { Owner = this };
+            dlg.ShowDialog();
+            PersistSettings();
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log("settings.open", ex);
+        }
+    }
+
+    // Push persisted preferences onto the live VM at startup.
+    private void ApplySettingsToVm(MainViewModel? vm)
+    {
+        if (vm is null) return;
+        vm.WindowOpacity = _settings.Opacity;
+        vm.Zoom = _settings.Zoom;
+        vm.AnimationsEnabled = _settings.AnimationsEnabled;
+        vm.IsTopmost = _settings.AlwaysOnTop;
+    }
+
+    // Read the live VM back into AppSettings and persist — called when Settings closes.
+    private void PersistSettings()
+    {
+        if (Vm is null) return;
+        _settings = _settings with
+        {
+            Version = 2,
+            Opacity = Vm.WindowOpacity,
+            Zoom = Vm.Zoom,
+            AnimationsEnabled = Vm.AnimationsEnabled,
+            AlwaysOnTop = Vm.IsTopmost,
+        };
+        _settingsStore.Save(_settings);
+    }
+
     // -- Toolbar handlers ------------------------------------------------
 
     private void IntervalDecrease_Click(object sender, RoutedEventArgs e)
@@ -222,24 +264,6 @@ public partial class MainWindowV2 : Window
             Keyboard.ClearFocus();
             e.Handled = true;
         }
-    }
-
-    private void ZoomIn_Click(object sender, RoutedEventArgs e)
-    {
-        if (Vm is null) return;
-        Vm.Zoom = Math.Min(MainViewModel.MaxZoom, Math.Round(Vm.Zoom + 0.1, 2));
-    }
-
-    private void ZoomOut_Click(object sender, RoutedEventArgs e)
-    {
-        if (Vm is null) return;
-        Vm.Zoom = Math.Max(MainViewModel.MinZoom, Math.Round(Vm.Zoom - 0.1, 2));
-    }
-
-    private void ZoomReset_Click(object sender, RoutedEventArgs e)
-    {
-        if (Vm is null) return;
-        Vm.Zoom = 1.0;
     }
 
     private void StatCycle_Click(object sender, RoutedEventArgs e) => Vm?.CycleStatDisplay();

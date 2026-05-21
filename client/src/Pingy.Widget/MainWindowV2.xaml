@@ -15,7 +15,7 @@
         AllowsTransparency="True"
         ResizeMode="CanResize"
         Background="Transparent"
-        Opacity="{Binding Value, ElementName=OpacitySlider, Mode=OneWay}"
+        Opacity="{Binding WindowOpacity, Mode=OneWay}"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
@@ -506,6 +506,8 @@
                                       ToolTip="Always on top">
                             <TextBlock Text="⌖" FontSize="14"/>
                         </ToggleButton>
+                        <!-- Settings -->
+                        <Button Style="{StaticResource ChromeButton}" Content="⚙" Click="SettingsButton_Click" ToolTip="Settings" FontSize="13"/>
                         <!-- Dedicated mini-mode toggle (separate from maximize) -->
                         <Button Style="{StaticResource ChromeButton}" Content="▭" Click="ModeToggle_Click" ToolTip="Collapse to mini" FontSize="12"/>
                         <!-- Standard Windows cluster: minimize | maximize-restore | close -->
@@ -515,14 +517,12 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- ROW 1: PRIMARY TOOLBAR -->
+                <!-- ROW 1: PRIMARY TOOLBAR — zoom + opacity moved into the Settings panel. -->
                 <Grid Grid.Row="1" Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0" Style="{StaticResource AccentButton}" Content="+ ADD TARGET" Click="AddTargetButton_Click" Margin="0,0,12,0" ToolTip="Add a host or device to monitor"/>
@@ -550,26 +550,6 @@
                         </Button>
                     </StackPanel>
 
-                    <!-- Zoom stepper -->
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                        <TextBlock Style="{StaticResource LabelText}" Text="ZOOM " VerticalAlignment="Center"/>
-                        <Button Style="{StaticResource ChromeButton}" Content="−" Click="ZoomOut_Click" MinWidth="22" ToolTip="Zoom out"/>
-                        <TextBlock Text="{Binding Zoom, StringFormat={}{0:P0}}"
-                                   FontFamily="Cascadia Mono, Consolas"
-                                   FontSize="10"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource CyanBrush}"
-                                   MinWidth="40"
-                                   TextAlignment="Center"
-                                   VerticalAlignment="Center"/>
-                        <Button Style="{StaticResource ChromeButton}" Content="+" Click="ZoomIn_Click" MinWidth="22" ToolTip="Zoom in"/>
-                        <Button Style="{StaticResource ChromeButton}" Content="⌂" Click="ZoomReset_Click" MinWidth="22" Margin="2,0,0,0" ToolTip="Reset zoom to 100%"/>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="4" Orientation="Vertical" VerticalAlignment="Center" Margin="0,0,4,0">
-                        <TextBlock Style="{StaticResource LabelText}" Text="OPACITY" HorizontalAlignment="Center"/>
-                        <Slider x:Name="OpacitySlider" Style="{StaticResource CyberSlider}" Minimum="0.3" Maximum="1.0" Value="0.95" Width="110" Height="14"/>
-                    </StackPanel>
                 </Grid>
 
                 <!-- ROW 2: FILTER + SORT BAR -->
@@ -1036,7 +1016,7 @@
                                                        Foreground="{StaticResource TextBrightBrush}"
                                                        TextTrimming="CharacterEllipsis">
                                                 <TextBlock.ToolTip>
-                                                    <ToolTip><TextBlock><Run Text="{Binding Label}"/><Run Text=" — "/><Run Text="{Binding Host}"/></TextBlock></ToolTip>
+                                                    <ToolTip><TextBlock><Run Text="{Binding Label, Mode=OneWay}"/><Run Text=" — "/><Run Text="{Binding Host, Mode=OneWay}"/></TextBlock></ToolTip>
                                                 </TextBlock.ToolTip>
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
