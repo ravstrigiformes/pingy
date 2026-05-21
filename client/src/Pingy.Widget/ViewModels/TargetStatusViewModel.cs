@@ -41,6 +41,9 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     private static readonly Brush FailBrush = MakeBrush(0xFF, 0x2E, 0x63); // same as bad
     private static readonly Brush UnknownBrush = MakeBrush(0xFF, 0xE6, 0x00); // yellow init
 
+    // Transparent filler for not-yet-used dot/marker slots — the viz buffers are fixed-length.
+    private static readonly Brush EmptyDotBrush = Brushes.Transparent;
+
     private static Brush BrushFor(Tier t) => t switch
     {
         Tier.Lan => LanBrush,
@@ -182,6 +185,15 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     public TargetStatusViewModel(Target target)
     {
         _target = target;
+
+        // Fixed-length viz buffers — bound to UniformGrids with matching column
+        // counts. Pre-filled once so per-tick updates assign by index (a cheap
+        // Replace that reuses the container) instead of Clear()+Add() (a Reset
+        // that tears down and rebuilds every dot/marker container every probe).
+        for (int i = 0; i < FullDotsCount; i++) RecentDots.Add(EmptyDotBrush);
+        for (int i = 0; i < MiniDotsCount; i++) RecentDotsMini.Add(EmptyDotBrush);
+        for (int i = 0; i < Window; i++) TimeoutFlags.Add(false);
+
         SyncPorts(target.Ports);
     }
 
@@ -267,27 +279,36 @@ public sealed partial class TargetStatusViewModel : ObservableObject
     private void RebuildRecentDots()
     {
         var arr = _samples.ToArray();
-        RebuildSlice(RecentDots, arr, FullDotsCount);
-        RebuildSlice(RecentDotsMini, arr, MiniDotsCount);
+        FillDotSlice(RecentDots, arr, FullDotsCount);
+        FillDotSlice(RecentDotsMini, arr, MiniDotsCount);
     }
 
-    private static void RebuildSlice(ObservableCollection<Brush> dest, Sample[] arr, int count)
+    // Assign brushes by index into a fixed-length buffer: real samples left-aligned,
+    // remaining slots Transparent. ReferenceEquals skips no-op writes, so a target
+    // with steady latency raises almost no CollectionChanged events per tick.
+    private static void FillDotSlice(ObservableCollection<Brush> dest, Sample[] arr, int count)
     {
-        dest.Clear();
         var start = Math.Max(0, arr.Length - count);
-        for (int i = start; i < arr.Length; i++)
-            dest.Add(BrushFor(arr[i].Tier));
+        var n = arr.Length - start;
+        for (int i = 0; i < count; i++)
+        {
+            var brush = i < n ? BrushFor(arr[start + i].Tier) : EmptyDotBrush;
+            if (!ReferenceEquals(dest[i], brush)) dest[i] = brush;
+        }
     }
 
     // One bool per chart slot (oldest..newest), true where the ping timed out.
-    // Drives the magenta "x" marker overlay on the chart.
+    // Drives the magenta "x" marker overlay — in-place index assignment, see FillDotSlice.
     private void RebuildTimeoutFlags()
     {
-        TimeoutFlags.Clear();
         var arr = _samples.ToArray();
         var start = Math.Max(0, arr.Length - Window);
-        for (int i = start; i < arr.Length; i++)
-            TimeoutFlags.Add(!arr[i].Ok);
+        var n = arr.Length - start;
+        for (int i = 0; i < Window; i++)
+        {
+            var flagged = i < n && !arr[start + i].Ok;
+            if (TimeoutFlags[i] != flagged) TimeoutFlags[i] = flagged;
+        }
     }
 
     // Color rule. Two signals are produced from the same window:

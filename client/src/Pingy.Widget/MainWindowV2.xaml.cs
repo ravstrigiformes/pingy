@@ -65,8 +65,15 @@ public partial class MainWindowV2 : Window
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton == MouseButton.Left && e.ClickCount == 1)
-            DragMove();
+        if (e.ChangedButton != MouseButton.Left || e.ClickCount != 1) return;
+
+        // Hand the drag to the OS window-move loop (WM_NCLBUTTONDOWN/HTCAPTION).
+        // DragMove() pumps the move in a WPF loop, which feels sticky on a layered
+        // (AllowsTransparency) window — the native loop is smooth.
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) { DragMove(); return; }
+        ReleaseCapture();
+        SendMessage(hwnd, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>
@@ -650,6 +657,16 @@ public partial class MainWindowV2 : Window
 
         Marshal.StructureToPtr(mmi, lParam, true);
     }
+
+    // Native window-move: let the OS run the drag loop (smooth on layered windows).
+    private const int WM_NCLBUTTONDOWN = 0x00A1;
+    private const int HTCAPTION = 0x0002;
+
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);

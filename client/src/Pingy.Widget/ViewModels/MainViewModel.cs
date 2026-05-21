@@ -29,6 +29,7 @@ public sealed partial class MainViewModel : ObservableObject
     private CancellationTokenSource? _cts;
     private TargetsConfig? _currentConfig;
     private bool _initialized;
+    private bool _applyingBatch;
 
     [ObservableProperty] private string _configPath = "";
     [ObservableProperty] private string _statusLine = "Loading targets…";
@@ -366,6 +367,10 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnTargetPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        // During a batched probe-apply the loop recomputes health and refreshes the
+        // view exactly once at the end — skip the per-property work here.
+        if (_applyingBatch) return;
+
         if (e.PropertyName == nameof(TargetStatusViewModel.StateBadge))
         {
             RecomputeHealth();
@@ -497,35 +502,72 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var snapshot = Targets.ToList();
         var timeout = System.TimeSpan.FromMilliseconds(1500);
-        var tasks = new List<Task>();
+
+        var icmpTasks = new List<Task<(TargetStatusViewModel vm, PingResult? result)>>();
+        var portTasks = new List<Task<(TargetStatusViewModel vm, PortProbeResult? result)>>();
 
         foreach (var tvm in snapshot)
         {
-            tasks.Add(ProbeIcmpAsync(tvm, timeout, ct));
+            icmpTasks.Add(ProbeIcmpAsync(tvm, timeout, ct));
             foreach (var port in tvm.Target.Ports ?? System.Array.Empty<TargetPort>())
-                tasks.Add(ProbePortAsync(tvm, port, timeout, ct));
+                portTasks.Add(ProbePortAsync(tvm, port, timeout, ct));
         }
 
-        await Task.WhenAll(tasks);
+        var all = new List<Task>(icmpTasks.Count + portTasks.Count);
+        all.AddRange(icmpTasks);
+        all.AddRange(portTasks);
+        await Task.WhenAll(all);
+
+        if (ct.IsCancellationRequested) return;
+
+        // Apply every result in one UI pass: a single dispatcher hop, one health
+        // recompute, and at most one view refresh per tick — instead of N+M
+        // dispatcher hops each triggering their own recompute and re-sort.
+        Application.Current?.Dispatcher.InvokeAsync(() =>
+        {
+            _applyingBatch = true;
+            try
+            {
+                foreach (var (vm, result) in icmpTasks.Select(t => t.Result))
+                    if (result is not null) vm.Update(result);
+                foreach (var (vm, result) in portTasks.Select(t => t.Result))
+                    if (result is not null) vm.UpdatePort(result);
+
+                RecomputeHealth();
+                if (!SelectedSort.IsDefault) TargetsView.Refresh();
+            }
+            catch (System.Exception ex)
+            {
+                Pingy.Widget.CrashLogger.Log("probe.apply", ex);
+            }
+            finally
+            {
+                _applyingBatch = false;
+            }
+        });
     }
 
-    private async Task ProbeIcmpAsync(TargetStatusViewModel tvm, System.TimeSpan timeout, CancellationToken ct)
+    // Probe methods run entirely off the UI thread and return their result (or null
+    // on cancel/error) — the caller applies them in one batched dispatcher pass.
+    // Each catches its own faults so Task.WhenAll never sees an unobserved exception.
+    private async Task<(TargetStatusViewModel vm, PingResult? result)> ProbeIcmpAsync(
+        TargetStatusViewModel tvm, System.TimeSpan timeout, CancellationToken ct)
     {
         try
         {
             var result = await _pinger.PingAsync(tvm.Target, timeout, ct);
-            Application.Current?.Dispatcher.Invoke(() => tvm.Update(result));
+            return (tvm, result);
         }
-        catch (System.OperationCanceledException) { }
+        catch (System.OperationCanceledException) { return (tvm, null); }
         catch (System.Exception ex)
         {
-            // Survive a single bad probe/UI update — log & keep the loop running. Without this
-            // the exception aggregates through Task.WhenAll → unobserved task → silent process exit.
             Pingy.Widget.CrashLogger.Log("probe.icmp", ex, $"target={tvm.Target.Id} host={tvm.Target.Host}");
+            return (tvm, null);
         }
     }
 
-    private async Task ProbePortAsync(TargetStatusViewModel tvm, TargetPort port, System.TimeSpan timeout, CancellationToken ct)
+    private async Task<(TargetStatusViewModel vm, PortProbeResult? result)> ProbePortAsync(
+        TargetStatusViewModel tvm, TargetPort port, System.TimeSpan timeout, CancellationToken ct)
     {
         try
         {
@@ -553,12 +595,13 @@ public sealed partial class MainViewModel : ObservableObject
                     tcp.RttMs, l7.RttMs, tcp.Status, l7.Status, System.DateTimeOffset.UtcNow);
             }
 
-            Application.Current?.Dispatcher.Invoke(() => tvm.UpdatePort(combined));
+            return (tvm, combined);
         }
-        catch (System.OperationCanceledException) { }
+        catch (System.OperationCanceledException) { return (tvm, null); }
         catch (System.Exception ex)
         {
             Pingy.Widget.CrashLogger.Log("probe.port", ex, $"target={tvm.Target.Id} host={tvm.Target.Host} port={port.Number}");
+            return (tvm, null);
         }
     }
 
