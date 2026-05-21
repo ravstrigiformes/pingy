@@ -227,6 +227,23 @@ REDIS_HOST=127.0.0.1
 - ✅ Module folder structure created under `server/app/Modules/`
 - ✅ All 4 standing revisions locked in (cadence 30s + 2-of-3, TCP probe, hashed username, dual-auth model)
 
+**Windows widget — shipped releases** (pre-release single-file `.exe` builds on GitHub
+Releases; client feature work runs ahead of the W1 backend tasks below):
+- `v0.1.0-dev.1`–`dev.6` — portable single-file build, resizable/responsive grid, TCP
+  port probing + crash diagnostics, L7 HTTP/HTTPS checks, timeout-aware charting +
+  owner field, system tray, ICMP-aware status
+- `v0.1.0-dev.7` — "This PC" readout (device name · LAN IP · gateway) with click-to-copy;
+  app-wide themed tooltips + missing button tooltips
+- `v0.1.0-dev.8` — interaction performance: removed per-tick visual-tree churn,
+  batched probe updates, native OS window drag
+- `v0.1.0-dev.9` — Settings panel (⚙ gear) + toolbar declutter + persisted preferences
+  (`config/settings.json`); fixed a latent `Run.Text` tooltip crash
+- `v0.1.0-dev.10` — live per-probe updates (a slow/timing-out target no longer stalls
+  the rest) + themed Settings steppers
+
+Full list with downloadable `.exe` per tag: GitHub Releases. Build/ship procedure is
+`.kris/docs/references/portable-release-build.md`.
+
 **Next (W1 remaining):**
 - ⬜ Install Laravel ecosystem packages (§7)
 - ⬜ Configure `server/.env` for Postgres + Redis
